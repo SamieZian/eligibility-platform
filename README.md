@@ -1,193 +1,211 @@
 # Eligibility & Enrollment Platform
 
-Take-home distributed system for health/dental eligibility (ICICI → Swiggy/Zomato → members + dependents). Ingests ANSI X12 **834** enrollment files (CSV/XLSX too), maintains a **bitemporal coverage timeline**, and powers a React search console.
+Distributed microservices system for healthcare eligibility. Ingests ANSI X12 **834** enrollment files (CSV/XLSX too), maintains a **bitemporal coverage timeline**, and powers a React search console.
 
-**One command to run everything locally:** `make up`
+**This is the orchestration / demo repo.** The actual services each live in their own repo:
 
----
+| Repo | Purpose | Stack |
+|---|---|---|
+| [`eligibility-atlas`](https://github.com/SamieZian/eligibility-atlas) | Enrollment — bitemporal core | Python + FastAPI + Postgres |
+| [`eligibility-member`](https://github.com/SamieZian/eligibility-member) | Members + dependents | Python + FastAPI + Postgres + KMS |
+| [`eligibility-group`](https://github.com/SamieZian/eligibility-group) | Payer / employer / subgroup / plan visibility | Python + FastAPI + Postgres |
+| [`eligibility-plan`](https://github.com/SamieZian/eligibility-plan) | Plan catalog | Python + FastAPI + Postgres + Redis |
+| [`eligibility-bff`](https://github.com/SamieZian/eligibility-bff) | GraphQL gateway + file upload | FastAPI + Strawberry GraphQL |
+| [`eligibility-workers`](https://github.com/SamieZian/eligibility-workers) | Ingestion / projector / outbox-relay | Python async |
+| [`eligibility-frontend`](https://github.com/SamieZian/eligibility-frontend) | React UI | Vite + React + TS + TanStack |
 
-## The diagram — 4 services, 4 databases
+Each service is **independently deployable** — its own Dockerfile, its own CI, its own database. They only communicate via the network (REST/GraphQL + Pub/Sub events).
+
+## Architecture
 
 ```
  ┌───────────────┐       ┌──────────────────────────────┐
  │ React + TS UI │──────▶│ BFF (FastAPI + GraphQL)      │
- │ (Vite, tan-   │       │ OIDC • circuit breakers      │
- │  stack-table) │       │ rate-limit • DataLoaders     │
- └───────────────┘       └───┬────┬─────┬─────┬─────────┘
-                             ▼    ▼     ▼     ▼
-               ┌──────────┐ ┌────────┐ ┌──────┐ ┌──────┐
-               │  atlas   │ │ member │ │group │ │ plan │   ◄── 4 services
-               │(enroll- │ │        │ │      │ │      │
-               │ ment,   │ │        │ │      │ │      │
-               │bitempo- │ │        │ │      │ │      │
-               │  ral)   │ │        │ │      │ │      │
-               └────┬─────┘ └───┬────┘ └──┬───┘ └──┬───┘
-                    ▼           ▼         ▼        ▼
-               ┌──────────┐ ┌────────┐ ┌──────┐ ┌──────┐
-               │ atlas_db │ │member_ │ │group_│ │plan_ │   ◄── 4 databases
-               │   (pg)   │ │  db    │ │  db  │ │  db  │
-               └────┬─────┘ └───┬────┘ └──┬───┘ └──┬───┘
-                    └───── outbox ────────┴────────┘
-                          │ (Debezium CDC + outbox relay)
-                          ▼
-                    Pub/Sub emulator (retries + DLQ)
-                          │
-                ┌─────────┴──────────┐
-                ▼                     ▼
-         ingestion worker       projector worker
-         (834/CSV → atlas)      (events + CDC → pg
-                                view + OpenSearch)
-                                     │
-                                     ▼
-                       ┌─────────────────────────┐
-                       │ eligibility_view (pg) + │
-                       │ OpenSearch              │
-                       └─────────────────────────┘
+ └───────────────┘       │ OIDC • circuit breakers      │
+                         │ rate-limit • DataLoaders     │
+                         └──┬──────┬─────┬──────┬───────┘
+                            ▼      ▼     ▼      ▼
+                      ┌────────┐┌────────┐┌──────┐┌──────┐
+                      │ atlas  ││ member ││group ││ plan │   ◄── 4 services
+                      │(enrol- ││        ││      ││      │
+                      │lment,  ││        ││      ││      │
+                      │bitempo-││        ││      ││      │
+                      │ ral)   ││        ││      ││      │
+                      └───┬────┘└───┬────┘└──┬───┘└──┬───┘
+                          ▼         ▼        ▼       ▼
+                      ┌────────┐┌────────┐┌──────┐┌──────┐
+                      │atlas_db││member_ ││group_││plan_ │   ◄── 4 databases
+                      │        ││  db    ││  db  ││  db  │
+                      └───┬────┘└───┬────┘└──┬───┘└──┬───┘
+                          └──── outbox ──────┴───────┘
+                                │
+                                ▼
+                      Pub/Sub emulator (retries + DLQ)
+                                │
+                    ┌───────────┼───────────┐
+                    ▼           ▼           ▼
+             ingestion      projector    outbox-
+             worker         worker       relay
+                                │
+                                ▼
+                      ┌─────────────────────┐
+                      │ eligibility_view +  │
+                      │ OpenSearch          │
+                      └─────────────────────┘
 ```
 
-Supporting infra (all in docker-compose): **Redis** (cache + rate-limit), **MinIO** (S3-compatible object store for raw files), **Pub/Sub emulator**, **OpenSearch**, **Jaeger** (OpenTelemetry UI).
+## Quickstart — 3 commands
 
-## Quickstart
+Prerequisites: **Docker** (or [colima](https://github.com/abiosoft/colima)), **git**, **gh** CLI (optional — only needed if cloning via SSH).
 
 ```bash
+# 1. Clone this repo
 git clone https://github.com/SamieZian/eligibility-platform.git
 cd eligibility-platform
-make up            # all 4 dbs, 4 services, bff, workers, OS, frontend — up
-make seed          # synthetic payers, employers, plans
-make ingest        # submits tests/golden/834_sample.x12 via BFF upload
-make verify        # asserts bitemporal invariants + OS projection
-open http://localhost:5173
+
+# 2. Clone all 7 sibling service repos into the parent dir
+./bootstrap.sh
+
+# 3. Bring everything up
+make up
 ```
 
-Useful URLs:
-- Frontend: http://localhost:5173
-- BFF GraphQL playground: http://localhost:4000/graphql
-- Jaeger: http://localhost:16686
-- MinIO: http://localhost:9001 (user: `minio` / `minio12345`)
-- OpenSearch: http://localhost:9200
+That's it. `make up` builds **8 Docker images** (4 services + bff + 3 workers + frontend) and spins them up with their 4 dedicated Postgres instances + Redis + Pub/Sub emulator + MinIO + OpenSearch + Jaeger.
+
+Layout after `bootstrap.sh`:
+
+```
+Desktop/
+├── eligibility-platform/     # ← you are here (orchestration + demo)
+│   ├── docker-compose.yml    # builds images from sibling repos
+│   ├── Makefile              # make up / seed / ingest / search / verify
+│   ├── samples/              # ← 834 files to upload
+│   ├── bootstrap.sh
+│   └── README.md             # this file
+├── eligibility-atlas/        # cloned by bootstrap.sh
+├── eligibility-member/
+├── eligibility-group/
+├── eligibility-plan/
+├── eligibility-bff/
+├── eligibility-workers/
+└── eligibility-frontend/
+```
+
+## Demo flow
+
+```bash
+make up                  # boot the full stack (~2-3 min first time, builds 8 images)
+make seed                # seed ICICI + Aetna payers, Swiggy + Zomato employers, 3 plans
+make ingest              # upload samples/834_sample.x12 via BFF
+make verify              # asserts bitemporal rows + OS projection
+
+open http://localhost:5173    # UI
+```
+
+In the UI:
+- **Grid**: 5 enrollments (Sharma, Patel, Kaur, Nair + Rohit the dependent).
+- **Quick search**: type `sharma` → filters to Priya + Rohit.
+- **Advanced Search**: click the button → modal with all 15 filter fields (Member ID, SSN last 4, employer, plan, DOB, date ranges, status, etc.).
+- **Member detail**: click a row → drawer with bitemporal timeline. For Simran Kaur (who had a CORRECTION in the 834) you'll see both the original in-force row and the corrected one.
+- **Upload**: nav → Upload → drag in `samples/834_sample.x12` → watch job status poll.
+
+## Feature checklist
+
+| Feature | Where | How to test |
+|---|---|---|
+| 4 independently-deployable services | Each has its own repo + Dockerfile | `docker ps` shows 4 distinct service containers |
+| 4 private databases | docker-compose.yml | `docker ps` shows 4 pg containers on ports 5441-5444 |
+| Bitemporal enrollment | `eligibility-atlas/app/domain/enrollment.py` | Ingest 834_sample.x12 → open Simran Kaur → timeline shows 2 rows (corrected + historical) |
+| Transactional outbox | `eligibility-common/outbox.py` + `eligibility-workers/outbox-relay/` | `select count(*) from outbox` after any write |
+| CQRS projector | `eligibility-workers/projector/` | `eligibility_view` table and OpenSearch `eligibility` index both populated |
+| Ingestion pipeline | `eligibility-workers/ingestion/` | `make ingest` → all INS loops mapped to atlas commands |
+| Idempotency | atlas `processed_segments` table | Re-ingest same file → no new enrollments (dedup by ISA13:GS06:ST02:INS_pos) |
+| GraphQL search | `eligibility-bff/app/schema.py` | `make search Q=sharma` |
+| Fuzzy search via OpenSearch | `eligibility-bff/app/search.py` | UI quick search box (250ms debounce) |
+| Advanced search modal | `eligibility-frontend/src/features/eligibility/AdvancedSearchModal.tsx` | Click "Advanced Search" in UI |
+| Bitemporal timeline UI | `eligibility-frontend/src/features/member/Detail.tsx` | Click any row → drawer with timeline |
+| File upload | `eligibility-bff/app/upload.py` + `.../frontend/.../FileUpload.tsx` | Upload page → pick file → watch status |
+| Saved views | `eligibility-frontend/src/features/eligibility/SavedViews.tsx` | "Saved Views" dropdown in toolbar |
+| Column config | Grid | "Columns" details in toolbar |
+| Density toggle | Grid | "Comfortable/Compact" dropdown |
+| Correlation IDs end-to-end | `eligibility-common/http_middleware.py` | `X-Correlation-Id` on every response + footer of UI |
+| Circuit breakers | `eligibility-common/circuit.py` | BFF → svc calls use CircuitBreaker |
+| Retry w/ jitter | `eligibility-common/retry.py` | Ingestion resolver wraps httpx calls |
+| KMS envelope encryption | `eligibility-common/kms.py` + member svc | `select ssn_ciphertext from members_lookup` |
+| HIPAA log scrubbing | `eligibility-common/logging.py` | Any "ssn" key in log output is `***` |
+
+## Sample 834 files
+
+Under `samples/` — see [`samples/README.md`](samples/README.md) for the full walkthrough of what's in each file. **Drag `samples/834_sample.x12` into the Upload page** or run `make ingest`.
+
+## All `make` targets
+
+```bash
+make up                              # docker compose up -d (builds from sibling repos)
+make down                            # stop
+make clean                           # stop + wipe volumes
+make logs [S=atlas]                  # tail logs (optionally single service)
+make seed                            # seed synthetic payers/employers/plans via BFF CLI
+make ingest [F=samples/834_sample.x12]   # upload 834 via BFF
+make search Q=sharma                 # fuzzy search via GraphQL
+make verify                          # assert DB + OS state
+make test                            # run all unit + integration tests
+make load                            # k6 small load run
+make chaos-kill-projector            # kill projector, write, restart, verify catch-up
+make replay-dlq TOPIC=xyz.dlq        # re-drive DLQ messages
+make psql D=atlas_db                 # psql into any service's DB
+make demo                            # automated tour
+```
+
+## Useful URLs once up
+
+| URL | What |
+|---|---|
+| http://localhost:5173 | Frontend |
+| http://localhost:4000/graphql | BFF GraphQL playground |
+| http://localhost:4000/files/eligibility | BFF file upload (POST) |
+| http://localhost:16686 | Jaeger (distributed traces) |
+| http://localhost:9001 | MinIO console (user: `minio` / `minio12345`) |
+| http://localhost:9200 | OpenSearch |
 
 ## Design highlights
 
 | Concern | Pattern used | Where |
 |---|---|---|
-| Retro-active 834 corrections | **Bitemporal** (valid_time + transaction_time) | `services/atlas/app/domain/enrollment.py` |
-| Atomic "write DB + emit event" | **Transactional outbox** | `libs/python-common/.../outbox.py` + `workers/outbox-relay/` |
-| Read-model sync | **CQRS** with projector consuming events (CDC-ready) | `workers/projector/` |
-| Search at scale | Postgres `eligibility_view` + OpenSearch (fuzzy) | `workers/projector/` + `services/bff/app/search.py` |
-| Multi-step workflows | **Saga orchestration** (FSM, compensations) | `services/atlas/app/domain/saga.py` |
-| Idempotency under 834 retries | `(trading_partner, ISA13, GS06, ST02, ins_pos)` dedup key | `services/atlas` + `workers/ingestion` |
-| Cascading failure prevention | **Circuit breakers + bulkheads + timeouts + retry w/ jitter** | `libs/python-common/.../circuit.py`, `retry.py` |
-| Tenant isolation | Postgres RLS + `app.tenant_id` session var | `libs/python-common/.../db.py` |
-| PHI | Envelope-encrypted SSN via KMS, PHI-scrubbing logger | `libs/python-common/.../kms.py`, `logging.py` |
-| Observability | OpenTelemetry → Jaeger, structured JSON logs, correlation IDs | `libs/python-common/.../tracing.py`, `http_middleware.py` |
-| Scalability | Partitioned `enrollments` by tenant hash; cursor pagination | atlas DDL; `services/bff/app/search.py` |
+| Retro-active 834 corrections | **Bitemporal** (valid_time + transaction_time) | `eligibility-atlas/app/domain/enrollment.py` |
+| Atomic "write DB + emit event" | **Transactional outbox** | every service's `outbox` table + `eligibility-workers/outbox-relay/` |
+| Read-model sync | **CQRS** via Pub/Sub events → projector | `eligibility-workers/projector/` |
+| Search at scale | Postgres `eligibility_view` (exact) + OpenSearch (fuzzy) | `eligibility-bff/app/search.py` |
+| Multi-step workflows | **Saga orchestration** (FSM + compensations) | `eligibility-atlas/app/domain/saga.py` |
+| 834 retry dedup | `(trading_partner, ISA13, GS06, ST02, ins_pos)` key | `processed_segments` table |
+| Cascading failure prevention | **Circuit breaker + timeout + retry w/ jitter** | `eligibility-common/circuit.py`, `retry.py` |
+| Tenant isolation | Postgres `set_config('app.tenant_id', ...)` per request | `eligibility-common/db.py` |
+| PHI at rest | Envelope-encrypted SSN via KMS | `eligibility-common/kms.py` |
+| Observability | OpenTelemetry → Jaeger + structured JSON logs + correlation IDs | `eligibility-common/tracing.py` |
 
-## Fault-tolerance budget (actual values in code)
+## Fault-tolerance budget
 
 | Edge | Timeout | Retries | Backoff | Circuit breaker |
 |---|---|---|---|---|
-| Browser → BFF | 15s / 5s srv | 1 on 503 | — | — |
-| BFF → service | 2s | 3 | exp 50/150/450ms + jitter | 5 fails / 10s window |
-| Service → Pub/Sub (relay) | 5s | up to 5, exp | 0.1 → 5s | open on > 5% err |
-| Pub/Sub → consumer | ack 60s | 7 | exp 10s → 600s | — (DLQ after 7) |
-| Projector → OS | 3s | 5, exp | 0.1 → 5s | — (graceful fallback to pg) |
-| BFF → OS | 1.5s | 2 | exp | degrade to pg-only search |
+| Browser → BFF | 15s client / 5s srv | 1 on 503 | — | — |
+| BFF → svc | 2s | 3 | exp 50/150/450ms + jitter | 5 fails / 10s window |
+| Service → Pub/Sub (relay) | 5s | 5 | exp 0.1s → 5s | open on > 5% err |
+| Pub/Sub → consumer | ack 60s | 7 | exp 10s → 600s | DLQ after 7 |
+| Projector → OS | 3s | 5 | exp 0.1s → 5s | graceful fallback to pg |
 
-## The 834 sample file
+## Repos and commits
 
-`tests/golden/834_sample.x12` is a ~3 KB deterministic file covering:
-- **ADD (021)** — subscriber Sharma Priya + spouse Rohit, Swiggy, PLAN-GOLD
-- **ADD** — Patel Amit, Zomato, PLAN-SILVER; Kaur Simran, Swiggy, PLAN-GOLD; Nair Arjun, Zomato, PLAN-SILVER
-- **TERMINATE (024)** — Patel Amit effective 2026-03-31
-- **CORRECTION (030)** — Kaur Simran's effective date moved from 2026-01-01 to 2026-01-15 (creates a bitemporal history row)
+This repo (eligibility-platform) contains:
+- `docker-compose.yml` — multi-repo build
+- `Makefile` — common commands
+- `bootstrap.sh` — clones all 7 sibling repos
+- `samples/` — 834 EDI files
+- `tests/e2e/` — end-to-end verifier
+- `tests/golden/` — 834 fixture generator
+- `docs/adr/` — architecture decision records
+- `docs/runbooks/` — on-call runbooks
 
-After `make ingest`:
-- atlas_db holds the bitemporal rows (closed old row + new corrected row for Simran).
-- Event feed fires `EnrollmentAdded/Terminated/Changed` to Pub/Sub.
-- Projector updates `eligibility_view` and the OpenSearch `eligibility` index.
-- `make verify` asserts all of the above.
-
-## Repo layout
-
-```
-├── services/                 # 4 domain services (FastAPI) — each with own pg DB
-│   ├── atlas/                # enrollment (the core bitemporal aggregate)
-│   ├── member/               # members + dependents
-│   ├── group/                # payer/employer/subgroup + plan visibility
-│   ├── plan/                 # plan catalog (Redis cache-aside)
-│   └── bff/                  # GraphQL gateway + REST file upload
-├── workers/
-│   ├── ingestion/            # 834 / CSV parse → atlas commands
-│   ├── projector/            # CQRS read-model projector (pg view + OS)
-│   └── outbox-relay/         # outbox → Pub/Sub
-├── libs/
-│   ├── python-common/        # errors, retry, circuit, outbox, pubsub, logging, tracing, kms
-│   └── x12-834/              # streaming 834 parser + golden files
-├── frontend/                 # Vite + React + TS + TanStack
-├── tests/
-│   ├── golden/               # 834_sample.x12, 834_replace.x12, 834_large.x12, generator
-│   ├── integration/
-│   ├── e2e/                  # verify_after_ingest.py
-│   ├── load/                 # k6 scripts
-│   └── chaos/                # chaos-kill-projector.sh
-├── docs/
-│   ├── adr/                  # architecture decision records
-│   └── runbooks/             # DLQ-non-empty, projector-lag, saga-stuck
-├── pulumi/gcp/               # production IaC for GCP
-├── policies/                 # OPA Rego (authz)
-├── .github/workflows/        # CI: lint, typecheck, unit, integration, security, build
-├── docker-compose.yml        # single-command local stack
-└── Makefile                  # up/down/seed/ingest/search/verify/load/chaos/demo
-```
-
-## Common commands
-
-```bash
-make up                              # bring the stack up
-make seed                            # seed payers/employers/plans
-make ingest F=tests/golden/834_sample.x12
-make search Q=sharma                 # fuzzy search via GraphQL
-make verify                          # asserts bitemporal + projection state
-make load                            # k6 small run
-make chaos-kill-projector            # kill projector, write, restart → catch-up
-make test                            # unit + integration
-make replay-dlq TOPIC=enrollment.events.dlq
-make logs S=atlas                    # tail a single service
-make psql D=atlas_db                 # psql into a service's db
-make down                            # stop the stack
-make clean                           # stop + remove volumes
-```
-
-## Extras shipped
-
-- **Saved views** (frontend localStorage) • **column config + density** • **dark mode**.
-- **Replay** mutation (`replayFile(fileId)`) for reprocessing a file.
-- **Correlation IDs** end-to-end — bottom-right footer in UI shows the last one.
-- **Idempotency keys** on mutating endpoints (shared helper).
-- **Typed error envelope** (`problem+json`-style) across REST & GraphQL.
-- **Hexagonal** layout in every service (`domain` / `application` / `infra` / `interfaces`).
-
-## What's scaffolded but documented-only
-
-| Area | Status |
-|---|---|
-| Debezium CDC wiring | container defined; using event-based projection primarily — CDC is additive |
-| Pulumi GCP IaC | scaffolded under `pulumi/gcp` (not applied) |
-| OPA Rego authz | Rego stubs under `policies/` (BFF hooks not yet wired) |
-| Temporal.io for sagas | atlas has a hand-rolled FSM; Temporal is the scale path |
-| Full chaos suite | `make chaos-kill-projector` works; broader Litmus experiments documented |
-| k6 load | `tests/load/search.k6.js` scaffolded |
-
-## Runbooks
-
-See `docs/runbooks/`:
-- `dlq-nonempty.md` — how to triage + replay
-- `projector-lag.md` — reconciliation procedure
-- `saga-stuck.md` — compensation + manual recovery
-
-## ADRs
-
-See `docs/adr/` — key decisions: bitemporal vs event-sourcing, outbox vs CDC as primary, pg+OS read model, hexagonal, saga-orchestration-not-choreography.
+All 7 service repos have their own README explaining what they do, how to run standalone, and how to test. CI is configured in each.
 
 ## License
 

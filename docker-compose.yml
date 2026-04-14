@@ -1,3 +1,16 @@
+# Meta docker-compose — builds images from sibling cloned repos.
+#
+# Before running: `./bootstrap.sh` (clones all 7 sibling repos into the parent dir).
+# Layout expected:
+#   ../eligibility-atlas/      (Dockerfile at root)
+#   ../eligibility-member/
+#   ../eligibility-group/
+#   ../eligibility-plan/
+#   ../eligibility-bff/
+#   ../eligibility-workers/    (3 Dockerfiles: ingestion/ projector/ outbox-relay/)
+#   ../eligibility-frontend/
+#   ./eligibility-platform/    (this repo — orchestration + samples + demo)
+
 services:
   # ───────── 4 databases, one per service (strict ownership) ─────────
   atlas_db:
@@ -82,9 +95,9 @@ services:
       COLLECTOR_OTLP_ENABLED: "true"
     ports: ["16686:16686", "4317:4317", "4318:4318"]
 
-  # ───────── 4 services (one per domain) ─────────
+  # ───────── 4 services — each built from its own sibling repo ─────────
   atlas:
-    build: { context: ., dockerfile: services/atlas/Dockerfile }
+    build: ../eligibility-atlas
     environment: &svc_env
       DATABASE_URL: postgresql+psycopg://postgres:${POSTGRES_PASSWORD:-dev_pw}@atlas_db:5432/atlas_db
       REDIS_URL: redis://redis:6379/0
@@ -100,7 +113,7 @@ services:
     ports: ["8001:8000"]
 
   member:
-    build: { context: ., dockerfile: services/member/Dockerfile }
+    build: ../eligibility-member
     environment:
       <<: *svc_env
       DATABASE_URL: postgresql+psycopg://postgres:${POSTGRES_PASSWORD:-dev_pw}@member_db:5432/member_db
@@ -111,7 +124,7 @@ services:
     ports: ["8002:8000"]
 
   group:
-    build: { context: ., dockerfile: services/group/Dockerfile }
+    build: ../eligibility-group
     environment:
       <<: *svc_env
       DATABASE_URL: postgresql+psycopg://postgres:${POSTGRES_PASSWORD:-dev_pw}@group_db:5432/group_db
@@ -122,7 +135,7 @@ services:
     ports: ["8003:8000"]
 
   plan:
-    build: { context: ., dockerfile: services/plan/Dockerfile }
+    build: ../eligibility-plan
     environment:
       <<: *svc_env
       DATABASE_URL: postgresql+psycopg://postgres:${POSTGRES_PASSWORD:-dev_pw}@plan_db:5432/plan_db
@@ -133,11 +146,12 @@ services:
       redis:   { condition: service_healthy }
     ports: ["8004:8000"]
 
-  # ───────── BFF + workers ─────────
   bff:
-    build: { context: ., dockerfile: services/bff/Dockerfile }
+    build: ../eligibility-bff
     environment:
       <<: *svc_env
+      DATABASE_URL: postgresql+psycopg://postgres:${POSTGRES_PASSWORD:-dev_pw}@atlas_db:5432/atlas_db
+      ATLAS_DB_URL: postgresql+psycopg://postgres:${POSTGRES_PASSWORD:-dev_pw}@atlas_db:5432/atlas_db
       ATLAS_URL: http://atlas:8000
       MEMBER_URL: http://member:8000
       GROUP_URL: http://group:8000
@@ -157,8 +171,11 @@ services:
       minio:  { condition: service_healthy }
     ports: ["4000:8000"]
 
+  # ───────── Workers (3 Dockerfiles inside eligibility-workers) ─────────
   ingestion:
-    build: { context: ., dockerfile: workers/ingestion/Dockerfile }
+    build:
+      context: ../eligibility-workers
+      dockerfile: ingestion/Dockerfile
     environment:
       <<: *svc_env
       ATLAS_URL: http://atlas:8000
@@ -176,7 +193,9 @@ services:
       atlas:  { condition: service_started }
 
   projector:
-    build: { context: ., dockerfile: workers/projector/Dockerfile }
+    build:
+      context: ../eligibility-workers
+      dockerfile: projector/Dockerfile
     environment:
       <<: *svc_env
       ATLAS_DB_URL: postgresql+psycopg://postgres:${POSTGRES_PASSWORD:-dev_pw}@atlas_db:5432/atlas_db
@@ -194,7 +213,9 @@ services:
       plan_db:     { condition: service_healthy }
 
   outbox_relay:
-    build: { context: ., dockerfile: workers/outbox-relay/Dockerfile }
+    build:
+      context: ../eligibility-workers
+      dockerfile: outbox-relay/Dockerfile
     environment:
       <<: *svc_env
       ATLAS_DB_URL: postgresql+psycopg://postgres:${POSTGRES_PASSWORD:-dev_pw}@atlas_db:5432/atlas_db
@@ -210,7 +231,7 @@ services:
       plan_db:   { condition: service_healthy }
 
   frontend:
-    build: { context: ./frontend, dockerfile: Dockerfile }
+    build: ../eligibility-frontend
     environment:
       VITE_BFF_URL: http://localhost:4000
     ports: ["5173:5173"]
