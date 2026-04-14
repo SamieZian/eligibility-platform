@@ -12,6 +12,7 @@ Ready-to-upload ANSI X12 834 (Benefit Enrollment and Maintenance) files for test
 | **`834_demo.x12`** ⭐ | **Default demo** — 18 members across Swiggy + Zomato + 4 subgroups + all 3 plans. Subscribers + dependents (Reddy family with child, Iyer family with spouse). Best for showing the platform's range. | 18 | ~3.6 KB |
 | `834_sample.x12` | The original test fixture — 5 ADDs (subscriber Sharma Priya + spouse Rohit, 3 more subscribers) + 1 TERMINATE (Patel Amit ends 2026-03-31) + 1 CORRECTION (Kaur Simran's effective date moves 2026-01-01 → 2026-01-15). Best for exercising the bitemporal timeline. | 5 + edits | ~3 KB |
 | `834_replace.x12` | Full-file-replace (`BGN08=22`). Demonstrates the saga that terminates all active enrollments not present in the new file. | 2 | small |
+| **`members_demo.csv`** | **Alternative ingestion path** — proves the platform handles CSV in addition to 834. 8 members (Sharma, Gupta, Rao, Iyengar, Kumar, Kapoor, Verma, Mehta). Same downstream pipeline (parser → atlas → events → projector). | 8 | ~1 KB |
 | `834_large.x12` | 1000 synthetic ADDs. For load-testing the ingestion pipeline. | 1000 | ~200 KB |
 
 ## What's in `834_demo.x12` (the recommended demo file)
