@@ -22,17 +22,40 @@ Each service is **independently deployable** — own repo, own Dockerfile, own d
 
 ## Prerequisites
 
-| Tool | Version | Why |
-|---|---|---|
-| **Docker** | 24+ | Container runtime (Docker Desktop, Colima, OrbStack — all work) |
-| **Docker Compose** | v2 (the `docker compose` plugin, not legacy `docker-compose`) | Orchestrates the 18 containers |
-| **Git** | any recent | Cloning |
-| **gh** CLI | optional | If you want to clone via SSH; HTTPS works without it |
-| **Make** | optional | Convenience targets |
-| **Python 3.11+** | optional | Only needed if you want to run a single service standalone outside docker |
-| **Node 20+** | optional | Same — only for standalone frontend dev |
+### Required
 
-System resources for `make up`: ~6 GB free RAM, ~10 GB free disk. First-time image build downloads ~2 GB.
+| Tool | Version | How to install |
+|---|---|---|
+| **Docker Engine** | 24+ | [Docker Desktop](https://www.docker.com/products/docker-desktop/) (macOS/Windows) · `apt install docker.io` / `dnf install docker` (Linux) · [OrbStack](https://orbstack.dev/) + [Colima](https://github.com/abiosoft/colima) also work |
+| **Docker Compose** | v2 — the `docker compose` plugin (NOT legacy `docker-compose`) | Ships with Docker Desktop · `apt install docker-compose-plugin` on Debian/Ubuntu |
+| **Git** | 2.30+ | `brew install git` · `apt install git` · [git-scm.com](https://git-scm.com/downloads) |
+| **GNU Make** | any recent | Pre-installed on macOS (via Xcode CLT) and Linux · Windows: use WSL2 |
+
+### Optional (only for running services outside Docker)
+
+| Tool | Version | When you need it |
+|---|---|---|
+| **Python** | 3.11–3.12 | Running a single service from its repo (`poetry run uvicorn …`) |
+| **Poetry** | 1.8+ | Installing per-service Python deps — `pipx install poetry==1.8.3` |
+| **Node.js** | 20+ | Running the frontend dev server outside Docker (`npm run dev`) |
+| **k6** | latest | Running the load tests in `tests/load/` |
+
+### System resources
+
+- **RAM**: ~6 GB free while `make up` is running (18 containers)
+- **Disk**: ~10 GB free — first-time image build downloads ~2 GB
+- **Ports used on localhost**: 3000 (frontend), 4000 (BFF), 5441–5444 (Postgres), 6379 (Redis), 8001–8004 (services), 8083 (Debezium), 8085 (Pub/Sub), 9000–9001 (MinIO), 9200 (OpenSearch), 16686 (Jaeger). If any of these are in use on your machine, stop the conflicting process before `make up`.
+
+### Verify your prerequisites
+
+```bash
+docker version                  # expect "Server: Docker Engine ... Version: 24+"
+docker compose version          # expect "Docker Compose version v2.x"
+git --version                   # any 2.30+
+make --version                  # any GNU Make
+```
+
+If all four print a version, you're ready.
 
 ## Architecture
 
@@ -75,35 +98,47 @@ Supporting infra (all in compose): **Redis** (cache + saga state), **MinIO** (S3
 
 ---
 
-## Quickstart — three commands
+## Quickstart — from zero to a running stack
+
+The platform is split across **8 repos** (one orchestration repo + 7 services).
+`bootstrap.sh` clones the 7 siblings next to the orchestration repo, so the
+very first step is to create a **dedicated workspace directory** that will
+hold all 8 side-by-side.
 
 ```bash
-# 1. Clone the orchestration repo
+# 1. Create a dedicated workspace (keeps the 8 repos together)
+mkdir -p ~/Desktop/eligibility-workspace && cd ~/Desktop/eligibility-workspace
+
+# 2. Clone the orchestration repo
 git clone https://github.com/SamieZian/eligibility-platform.git
 cd eligibility-platform
 
-# 2. Clone all 7 sibling service repos into the parent dir
+# 3. Clone the 7 sibling service repos next to this one
 ./bootstrap.sh
 
-# 3. Configure (.env is optional — defaults work)
+# 4. Copy the env template (defaults work for local dev; no edits needed)
 cp .env.example .env
 
-# 4. Boot the whole stack — builds 9 images, starts 18 containers
+# 5. Boot the whole stack — builds 9 Docker images, starts 18 containers (~3 min first time)
 make up
 ```
 
-Layout after `bootstrap.sh`:
+When `make up` finishes, the console prints `All services healthy.` and the
+console UI is at http://localhost:3000.
+
+**Layout after these steps:**
 
 ```
-Desktop/  (or wherever you cloned)
-├── eligibility-platform/     ← you are here
+~/Desktop/eligibility-workspace/         ← the workspace dir you created in step 1
+├── eligibility-platform/                ← orchestration (this repo); where you run make
 │   ├── docker-compose.yml
 │   ├── Makefile
-│   ├── samples/              ← 834 EDI files to upload
+│   ├── samples/                         ← sample 834 EDI files for `make ingest`
 │   ├── bootstrap.sh
-│   ├── .env.example
-│   └── README.md             ← this file
-├── eligibility-atlas/        ← cloned by bootstrap.sh
+│   ├── ARCHITECTURE.md                  ← full design doc
+│   ├── .env.example  →  .env
+│   └── README.md                        ← this file
+├── eligibility-atlas/                   ← cloned by bootstrap.sh
 ├── eligibility-member/
 ├── eligibility-group/
 ├── eligibility-plan/
@@ -111,6 +146,21 @@ Desktop/  (or wherever you cloned)
 ├── eligibility-workers/
 └── eligibility-frontend/
 ```
+
+> **Windows users**: run all commands inside **WSL2 Ubuntu** (Docker Desktop's
+> WSL2 backend mounts the filesystem there). PowerShell / cmd will not work
+> — Makefile + bash heredocs are POSIX-only.
+
+### If something goes wrong during `make up`
+
+```bash
+make down                               # stop + remove containers
+docker compose logs --tail 100 atlas    # inspect one service's logs
+make clean                              # stop + delete volumes (nuclear — wipes seeded data)
+make up                                 # try again
+```
+
+Port conflicts are the most common issue — see the [prerequisite port list](#system-resources) above.
 
 ## Demo flow
 
