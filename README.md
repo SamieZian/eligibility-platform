@@ -126,6 +126,11 @@ In the UI:
 - **Groups** tab (bonus task) — payer / employer / subgroup / plan-visibility CRUD
 - **Upload** tab — drag in any 834/CSV file from `samples/`, watch it process
 - **+ Add New Member** button — full form, orchestrates create-member + create-enrollment in one round-trip via BFF GraphQL `addMember` mutation. Auto-generates Member ID Card if blank.
+- **Row Actions menu** (☰ on each row):
+  - *View timeline* — opens the member drawer with a **visual Gantt chart** of coverage segments (green = active, red = termed, grey = historical), today marker, plan-grouped rows. Toggle to tabular view for raw bitemporal columns.
+  - *Terminate* — closes the in-force segment on a chosen date (bitemporally correct: opens a TERMED row, preserves the original ACTIVE row's history).
+  - *Change plan* — saga: TERMINATE old (day before new effective) + ADD new. Produces two new timeline segments.
+  - *Edit details* — correct member name / DOB / gender. Upserts via member svc, emits `MemberUpserted`, projector fans the new name into `eligibility_view`.
 
 ## Useful URLs
 
@@ -154,9 +159,10 @@ In the UI:
 | Eligibility grid (sort, filter, pagination, column config, density) | ✓ |
 | Advanced search modal (15 fields) | ✓ |
 | Quick search (debounced, fuzzy via OS) | ✓ |
-| Member detail drawer with bitemporal timeline | ✓ |
+| Member detail drawer with bitemporal **Gantt chart** (+ tabular toggle) | ✓ |
 | **Add Member** form wired end-to-end | ✓ |
 | **Groups admin** — payer / employer / subgroup / plan visibility CRUD (bonus) | ✓ |
+| **Row actions** — View timeline / Terminate / Change plan / Edit details | ✓ |
 | File upload page with job status polling | ✓ |
 | Saved views (per-user filter presets) | ✓ |
 | Light + dark theme | ✓ |
