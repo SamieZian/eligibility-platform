@@ -16,7 +16,7 @@ Distributed microservices system for healthcare eligibility. Ingests ANSI X12 **
 
 Each service is **independently deployable** — own repo, own Dockerfile, own database, own CI. They communicate only via the network (REST/GraphQL + Pub/Sub events).
 
-**📐 [ARCHITECTURE.md](ARCHITECTURE.md)** — Full staff-level design doc: topology, request-path walkthroughs, every tech choice with rationale + rejected alternatives, bitemporal deep-dive, CQRS reasoning, production GCP deployment, and what we consciously did NOT build.
+**📐 [ARCHITECTURE.md](ARCHITECTURE.md)** — Reader's guide to the whole system: topology, request-path walkthroughs, tech choices with rationale + rejected alternatives, bitemporal deep-dive, CQRS reasoning, production GCP deployment, and what we consciously did NOT build.
 
 ---
 

@@ -1,10 +1,11 @@
 # Architecture — Eligibility & Enrollment Platform
 
-Staff-level design doc for the whole system. Covers the topology, the data
-flows for every user-visible action, every tech choice with its rejected
-alternatives, and the cross-cutting concerns (observability, security,
-resilience). Read this end-to-end to know *why* the code looks the way it
-does, not just *what* it does.
+This document describes how the platform is built: the services and how they
+talk to each other, the data flows behind each user-visible action, the
+technology choices and what we considered instead, and the cross-cutting
+concerns (observability, security, resilience). It is meant as a reader's
+guide — start at the top, read linearly, and by the end you should
+understand *why* the code is organised the way it is.
 
 ---
 
@@ -652,8 +653,7 @@ pulumi up
 
 ## 11. What we deliberately did NOT build (and why)
 
-Staff-level engineering is as much about knowing what NOT to add as what to
-add. Omissions with reasons:
+Scope decisions matter as much as what we built. Omissions with reasons:
 
 | Omitted | Why |
 |---|---|
@@ -670,9 +670,10 @@ add. Omissions with reasons:
 
 ---
 
-## 12. For reviewers — the "why does this look production-ready" quick list
+## 12. Where to look in the code
 
-If you have 15 minutes and want to verify this isn't a toy:
+If you have 15 minutes and want to map the concepts in this doc to the
+actual files, start here:
 
 - [`services/atlas/app/domain/enrollment.py`](../eligibility-atlas/app/domain/enrollment.py) — pure-Python bitemporal aggregate. No I/O, no SQL.
 - [`services/bff/app/graphql_extensions.py`](../eligibility-bff/app/graphql_extensions.py) — custom Strawberry error envelope + DataLoader + depth-limit validator. Production-grade GraphQL hygiene.
@@ -685,7 +686,7 @@ If you have 15 minutes and want to verify this isn't a toy:
 - [`tests/golden/834_sample.x12`](tests/golden/834_sample.x12) + `generate_834.py` — deterministic sample file used in CI.
 - [`README.md §4.5`](README.md#fault-tolerance--retry-matrix-explicit-per-layer) — per-edge timeout/retry/breaker/fallback policy.
 
-And the live demo flow:
+And a live walk-through of the whole platform:
 ```bash
 make up                 # 18 containers come up
 make seed               # synthetic payer/employer/plan/member data
@@ -699,5 +700,4 @@ open http://localhost:3000
 
 ---
 
-*Last updated: 2026-04-14. Kept in sync with the code via a CI check
-(`make docs-check`).*
+*Last updated: 2026-04-14.*
