@@ -9,7 +9,7 @@ understand *why* the code is organised the way it is.
 
 ---
 
-## 1. TL;DR
+## 1. Summary
 
 Eight independently deployable units — **four bounded-context services** that
 own data, **one BFF** that speaks GraphQL to the browser, **three stateless
