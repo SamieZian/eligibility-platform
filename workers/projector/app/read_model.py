@@ -237,7 +237,7 @@ UPDATE eligibility_view SET
   ssn_last4 = :ssn_last4,
   card_number = :card_number,
   updated_at = now()
-WHERE member_id = :member_id
+WHERE member_id = CAST(:member_id AS UUID)
 """
 
 UPDATE_VIEW_PLAN_SQL = """
@@ -245,14 +245,14 @@ UPDATE eligibility_view SET
   plan_code = :plan_code,
   plan_name = :name,
   updated_at = now()
-WHERE plan_id = :plan_id
+WHERE plan_id = CAST(:plan_id AS UUID)
 """
 
 UPDATE_VIEW_EMPLOYER_SQL = """
 UPDATE eligibility_view SET
   employer_name = :name,
   updated_at = now()
-WHERE employer_id = :employer_id
+WHERE employer_id = CAST(:employer_id AS UUID)
 """
 
 UPDATE_ENROLLMENT_CHANGES_SQL_PREFIX = "UPDATE eligibility_view SET updated_at = now()"

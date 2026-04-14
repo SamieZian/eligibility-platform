@@ -49,13 +49,30 @@ PLANS = [
 ]
 
 
-async def _post(client: httpx.AsyncClient, path: str, body: dict[str, Any]) -> dict[str, Any]:
+async def _post(
+    client: httpx.AsyncClient,
+    path: str,
+    body: dict[str, Any],
+    *,
+    retry_on_5xx: bool = True,
+) -> dict[str, Any]:
+    """POST with retry. On persistent 5xx for non-idempotent paths, returns {}.
+
+    Seed is tolerant — it's fine to run twice.
+    """
     for attempt in range(5):
         try:
             r = await client.post(path, json=body, timeout=10.0)
             r.raise_for_status()
             return r.json()
-        except httpx.HTTPError as e:
+        except httpx.HTTPStatusError as e:
+            if attempt == 4 or not retry_on_5xx:
+                if e.response.status_code >= 500 and path.endswith("/subgroups"):
+                    # Subgroup create isn't idempotent and may 500 on repeat seed; tolerate.
+                    return {}
+                raise
+            await asyncio.sleep(0.5 * (2**attempt))
+        except httpx.HTTPError:
             if attempt == 4:
                 raise
             await asyncio.sleep(0.5 * (2**attempt))

@@ -213,6 +213,53 @@ async def handle_enrollment_added(
     }
     await read_model.upsert_eligibility_view(session, row)
 
+    # Backfill any still-null denormalized fields for THIS row. Handles the
+    # race where MemberUpserted / PlanUpserted / EmployerUpserted may have
+    # landed in parallel subscribers with a transaction that hadn't committed
+    # when we fetched their lookup entries above.
+    from sqlalchemy import text as _text
+
+    await session.execute(
+        _text(
+            """
+            UPDATE eligibility_view v SET
+              first_name = COALESCE(v.first_name, m.first_name),
+              last_name  = COALESCE(v.last_name,  m.last_name),
+              member_name = COALESCE(NULLIF(v.member_name, ''), UPPER(m.first_name || ' ' || m.last_name)),
+              card_number = COALESCE(v.card_number, m.card_number),
+              dob = COALESCE(v.dob, m.dob),
+              gender = COALESCE(v.gender, m.gender),
+              ssn_last4 = COALESCE(v.ssn_last4, m.ssn_last4)
+            FROM members_lookup m
+            WHERE v.enrollment_id = CAST(:eid AS UUID) AND v.member_id = m.member_id
+            """
+        ),
+        {"eid": enrollment_id},
+    )
+    await session.execute(
+        _text(
+            """
+            UPDATE eligibility_view v SET
+              plan_name = COALESCE(v.plan_name, p.name),
+              plan_code = COALESCE(v.plan_code, p.plan_code)
+            FROM plans_lookup p
+            WHERE v.enrollment_id = CAST(:eid AS UUID) AND v.plan_id = p.plan_id
+            """
+        ),
+        {"eid": enrollment_id},
+    )
+    await session.execute(
+        _text(
+            """
+            UPDATE eligibility_view v SET
+              employer_name = COALESCE(v.employer_name, e.name)
+            FROM employers_lookup e
+            WHERE v.enrollment_id = CAST(:eid AS UUID) AND v.employer_id = e.employer_id
+            """
+        ),
+        {"eid": enrollment_id},
+    )
+
     if os_url:
         await os_index.upsert(os_url, _view_row_to_os_doc(row))
 
