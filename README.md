@@ -144,6 +144,15 @@ In the UI:
 | http://localhost:9200 | OpenSearch |
 | postgres://localhost:5441 / 5442 / 5443 / 5444 | atlas / member / group / plan DBs |
 
+## Deploy to GCP
+
+Production IaC lives in [`pulumi/gcp/`](pulumi/gcp/) — a Pulumi Python
+program that deploys all services to **Cloud Run**, **Cloud SQL**
+(one Postgres per bounded context), **Pub/Sub** (topics + subs + DLQ),
+**Cloud Storage**, **Secret Manager**, and **Artifact Registry** on a
+private VPC. See [`pulumi/gcp/README.md`](pulumi/gcp/README.md) for
+install / `pulumi up` / teardown.
+
 ## Feature checklist (as built)
 
 | Feature | Status |
@@ -176,6 +185,17 @@ In the UI:
 | Health endpoints (`/livez`, `/readyz`) on every service | ✓ |
 | `.env.example` in every repo | ✓ |
 | Per-repo README with prereqs + setup + test | ✓ |
+| **Idempotency middleware** (HTTP `Idempotency-Key` → dedup, replay on retry) | ✓ |
+| **Optimistic locking** (`version` column enforced on UPDATEs → 412 on conflict) | ✓ |
+| **Tenant isolation** on member lookup (`X-Tenant-Id` required + matched) | ✓ |
+| **Postgres `statement_timeout` / `lock_timeout`** per connection (pool safety) | ✓ |
+| **SIGTERM graceful drain** (`/readyz` → 503, in-flight drains, pool disposed) | ✓ |
+| **GraphQL error envelope** (`extensions.code` + `retryable` + `correlation_id`) | ✓ |
+| **GraphQL DataLoader** batching (kills N+1 on `groupAdmin`) | ✓ |
+| **GraphQL query depth limit** (max 8, rejects AST-expanded attacks) | ✓ |
+| **GCP-native observability** (Cloud Logging + Cloud Trace exporters, opt-in) | ✓ |
+| **Pulumi Python IaC** for GCP (Cloud Run, Cloud SQL, Pub/Sub, GCS, SM) | ✓ |
+| **Vertex AI Document AI** hook (scanned-PDF 834 extraction, opt-in) | ✓ |
 
 ## Sample 834 files
 

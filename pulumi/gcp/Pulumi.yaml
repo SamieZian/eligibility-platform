@@ -1,0 +1,10 @@
+name: eligibility-platform
+description: |
+  Pulumi IaC for the Eligibility & Enrollment Platform on GCP.
+  Provisions VPC, Cloud SQL (one per bounded context), Pub/Sub
+  (topics + subs + DLQ), Cloud Storage, Secret Manager, Artifact
+  Registry, and Cloud Run services for the 4 FastAPI services + BFF.
+runtime:
+  name: python
+  options:
+    virtualenv: venv

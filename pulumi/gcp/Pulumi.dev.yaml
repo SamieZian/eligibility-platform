@@ -1,0 +1,8 @@
+config:
+  # Replace with your actual GCP project id before `pulumi up`.
+  # `pulumi config set gcp:project YOUR_PROJECT`
+  gcp:project: REPLACE_ME
+  gcp:region: asia-south1
+  # Stack-local knobs. Override via `pulumi config set <key> <value>`.
+  eligibility-platform:env: dev
+  eligibility-platform:image_tag: latest
