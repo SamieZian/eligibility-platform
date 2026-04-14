@@ -139,7 +139,7 @@ export function Grid() {
                 }}
               >
                 {ALL_COLUMNS.filter((c) => visible.includes(c.key)).map((c) => (
-                  <td key={c.key}>{renderCell(row, c.key)}</td>
+                  <td key={c.key}>{renderCell(row as unknown as Record<string, unknown>, c.key)}</td>
                 ))}
               </tr>
             ))}

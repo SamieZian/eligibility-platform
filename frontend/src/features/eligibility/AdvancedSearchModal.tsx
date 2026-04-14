@@ -18,7 +18,7 @@ export function AdvancedSearchModal({ initial, onClose, onApply }: Props) {
   }
 
   return (
-    <Modal onClose={onClose} title="Advanced Search" ariaLabel="Advanced enrollment search">
+    <Modal open onClose={onClose} title="Advanced Search" size="lg">
       <form
         className={styles.grid}
         onSubmit={(e) => {
