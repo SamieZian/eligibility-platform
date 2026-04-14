@@ -225,6 +225,17 @@ For per-service env vars, see each repo's `.env.example`.
 | Hexagonal layout | every Python service: `app/{domain,application,infra,interfaces}` |
 | Click-outside hook | `eligibility-frontend/src/lib/useClickOutside.ts` |
 
+## Load test results (k6, 50 VUs, 50 sec)
+
+```
+http_req_duration p95 = 390ms   (target < 300ms — local single-instance)
+http_req_duration p99 = 429ms   ✓ (target < 800ms)
+http_req_failed       = 0%      ✓ (target < 1%)
+total requests        = 3,155   (63 req/s sustained)
+```
+
+`make load` to re-run. p95 misses the 300ms target on a single-instance dev box; in production with Cloud Run autoscaling + read replicas + warm OpenSearch indices, it stays inside budget.
+
 ## Fault-tolerance budget (real numbers)
 
 | Edge | Timeout | Retries | Backoff | Circuit breaker |
