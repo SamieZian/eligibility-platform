@@ -67,7 +67,7 @@ test-poetry:
 	@echo "Running pytest in all 6 Python repos via Poetry"
 	@for d in ../eligibility-atlas ../eligibility-member ../eligibility-group ../eligibility-plan ../eligibility-bff; do \
 	  if [ -d "$$d" ]; then printf "%-30s " "$$(basename $$d):"; \
-	    (cd $$d && poetry run pytest tests --no-header 2>&1 | grep -E "passed|failed|error" | tail -1); fi; \
+	    (cd $$d && poetry run pytest --no-header 2>&1 | grep -E "passed|failed|error" | tail -1); fi; \
 	done
 	@if [ -d ../eligibility-workers ]; then \
 	  for w in ingestion projector outbox-relay; do \
