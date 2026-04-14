@@ -1,4 +1,4 @@
-.PHONY: help up down logs seed ingest search verify test load chaos-kill-projector replay-dlq lint fmt demo clean psql bootstrap
+.PHONY: help up down logs seed ingest search verify test test-poetry install-poetry load chaos-kill-projector replay-dlq lint fmt demo clean psql bootstrap
 
 SHELL := /bin/bash
 COMPOSE := docker compose
@@ -10,10 +10,11 @@ help:
 	@echo "  make down                stop and remove"
 	@echo "  make logs [S=svc]        tail logs (optionally single service)"
 	@echo "  make seed                seed synthetic payers/employers/plans"
-	@echo "  make ingest [F=file]     upload an 834/CSV via BFF (default: samples/834_sample.x12)"
+	@echo "  make ingest [F=file]     upload an 834/CSV via BFF (default: samples/834_demo.x12, 18 members)"
 	@echo "  make search Q=sharma     fuzzy search via GraphQL"
 	@echo "  make verify              assert DB + OS state after ingest"
-	@echo "  make test                run all tests"
+	@echo "  make test                run pytest in every repo via Poetry"
+	@echo "  make install-poetry      poetry install in every repo (one-time setup)"
 	@echo "  make load                k6 small load run"
 	@echo "  make chaos-kill-projector  kill projector, write, restart, verify catch-up"
 	@echo "  make replay-dlq TOPIC=.. replay a DLQ topic"
@@ -42,7 +43,7 @@ seed:
 	$(COMPOSE) exec -T bff python -m app.cli seed
 
 ingest:
-	@F=$${F:-samples/834_sample.x12}; \
+	@F=$${F:-samples/834_demo.x12}; \
 	echo "Ingesting $$F"; \
 	curl -sS -X POST http://localhost:4000/files/eligibility \
 	  -H "X-Tenant-Id: 11111111-1111-1111-1111-111111111111" \
@@ -60,19 +61,30 @@ search:
 verify:
 	python3 tests/e2e/verify_after_ingest.py
 
-test:
+test: test-poetry
+
+test-poetry:
+	@echo "Running pytest in all 6 Python repos via Poetry"
 	@for d in ../eligibility-atlas ../eligibility-member ../eligibility-group ../eligibility-plan ../eligibility-bff; do \
-	  if [ -d "$$d" ]; then echo "--- $$d"; \
-	    (cd $$d && PYTHONPATH=.:libs/python-common/src python -m pytest tests -q 2>&1 | tail -5); fi; \
+	  if [ -d "$$d" ]; then printf "%-30s " "$$(basename $$d):"; \
+	    (cd $$d && poetry run pytest tests --no-header 2>&1 | grep -E "passed|failed|error" | tail -1); fi; \
 	done
 	@if [ -d ../eligibility-workers ]; then \
 	  for w in ingestion projector outbox-relay; do \
-	    echo "--- workers/$$w"; \
-	    (cd ../eligibility-workers/$$w && PYTHONPATH=.:../libs/python-common/src:../libs/x12-834/src python -m pytest tests -q 2>&1 | tail -5); \
+	    printf "%-30s " "workers/$$w:"; \
+	    (cd ../eligibility-workers && PYTHONPATH=$$w:libs/python-common/src:libs/x12-834/src poetry run pytest $$w/tests --no-header 2>&1 | grep -E "passed|failed|error" | tail -1); \
 	  done; \
 	fi
 
+install-poetry:
+	@echo "Installing Poetry venvs in all 6 Python repos (uses python3.12)"
+	@for d in ../eligibility-atlas ../eligibility-member ../eligibility-group ../eligibility-plan ../eligibility-bff ../eligibility-workers; do \
+	  if [ -d "$$d" ]; then echo "--- $$(basename $$d)"; \
+	    (cd $$d && poetry env use python3.12 2>&1 | tail -1; poetry install --no-root 2>&1 | tail -1); fi; \
+	done
+
 load:
+	@command -v k6 >/dev/null 2>&1 || { echo "k6 not installed. Install: brew install k6"; exit 1; }
 	k6 run tests/load/search.k6.js
 
 chaos-kill-projector:
