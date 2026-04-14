@@ -166,12 +166,23 @@ Port conflicts are the most common issue — see the [prerequisite port list](#s
 
 ```bash
 make up                  # boot everything (~3 min first time, builds 9 images)
-make seed                # seed payers (ICICI, Aetna), employers (Swiggy, Zomato), plans
-make ingest              # upload samples/834_sample.x12 via the BFF REST endpoint
+make seed-demo           # rich dataset: seed + ingest + varied statuses (active/pending/terminated/corrected)
 make verify              # asserts bitemporal rows + projector caught up
 
 open http://localhost:3000    # the React UI
 ```
+
+Or, for the minimal flow (just the raw 834 ingest, no post-ingest mutations):
+
+```bash
+make seed                # payers + employers + plans
+make ingest              # 18 members from samples/834_demo.x12 (all active)
+```
+
+`make seed-demo` builds on `make seed` + `make ingest` and adds:
+- **4 pending members** with future effective dates (2026-08-01)
+- **3 terminations** closing existing active coverage on 2026-06-30
+- **1 plan change saga** — one member switches Silver → Bronze on 2026-07-01 (shows as two bitemporal segments in the timeline drawer)
 
 In the UI:
 - **Eligibility** tab — 24+ enrollments, search "sharma", advanced filters, click any row for the bitemporal timeline drawer

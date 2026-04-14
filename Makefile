@@ -42,6 +42,16 @@ logs:
 seed:
 	$(COMPOSE) exec -T bff python -m app.cli seed
 
+# Rich demo dataset: seed refs + ingest 18-member 834 + post-ingest mutations
+# that produce varied statuses (active + pending + terminated + corrected).
+# Run AFTER `make up`. Idempotent on a fresh stack; re-runs may error because
+# the ingest step rejects duplicate segments.
+seed-demo:
+	@$(MAKE) seed
+	@$(MAKE) ingest
+	@echo ""
+	@./scripts/seed_demo.sh
+
 ingest:
 	@F=$${F:-samples/834_demo.x12}; \
 	echo "Ingesting $$F"; \
