@@ -1,0 +1,51 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+*.egg-info/
+dist/
+build/
+.tox/
+
+# Node / frontend
+node_modules/
+.next/
+dist/
+.parcel-cache/
+frontend/dist/
+frontend/node_modules/
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*~
+
+# Env files (real secrets stay out; commit only .env.example)
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Docker
+.docker/
+
+# Pulumi
+Pulumi.*.yaml
+!Pulumi.yaml
+!Pulumi.dev.yaml
+
+# Local data
+data/
+*.log

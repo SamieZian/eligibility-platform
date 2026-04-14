@@ -1,0 +1,226 @@
+services:
+  # ───────── 4 databases, one per service (strict ownership) ─────────
+  atlas_db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: atlas_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dev_pw}
+    ports: ["5441:5432"]
+    volumes: [atlas_pg:/var/lib/postgresql/data]
+    healthcheck: { test: ["CMD-SHELL", "pg_isready -U postgres"], interval: 5s, retries: 20 }
+
+  member_db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: member_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dev_pw}
+    ports: ["5442:5432"]
+    volumes: [member_pg:/var/lib/postgresql/data]
+    healthcheck: { test: ["CMD-SHELL", "pg_isready -U postgres"], interval: 5s, retries: 20 }
+
+  group_db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: group_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dev_pw}
+    ports: ["5443:5432"]
+    volumes: [group_pg:/var/lib/postgresql/data]
+    healthcheck: { test: ["CMD-SHELL", "pg_isready -U postgres"], interval: 5s, retries: 20 }
+
+  plan_db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: plan_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dev_pw}
+    ports: ["5444:5432"]
+    volumes: [plan_pg:/var/lib/postgresql/data]
+    healthcheck: { test: ["CMD-SHELL", "pg_isready -U postgres"], interval: 5s, retries: 20 }
+
+  # ───────── Shared infra ─────────
+  redis:
+    image: redis:7-alpine
+    ports: ["6379:6379"]
+    healthcheck: { test: ["CMD", "redis-cli", "ping"], interval: 5s, retries: 20 }
+
+  pubsub:
+    image: gcr.io/google.com/cloudsdktool/google-cloud-cli:emulators
+    command: >
+      gcloud beta emulators pubsub start
+      --host-port=0.0.0.0:8085
+      --project=${PUBSUB_PROJECT_ID:-local-eligibility}
+    ports: ["8085:8085"]
+    healthcheck: { test: ["CMD-SHELL", "curl -fsS http://localhost:8085 >/dev/null || exit 1"], interval: 5s, retries: 20 }
+
+  minio:
+    image: minio/minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minio}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minio12345}
+    ports: ["9000:9000", "9001:9001"]
+    volumes: [minio_data:/data]
+    healthcheck: { test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"], interval: 5s, retries: 20 }
+
+  opensearch:
+    image: opensearchproject/opensearch:2.13.0
+    environment:
+      - discovery.type=single-node
+      - plugins.security.disabled=true
+      - OPENSEARCH_INITIAL_ADMIN_PASSWORD=Admin_1234!
+      - "OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m"
+    ports: ["9200:9200"]
+    volumes: [os_data:/usr/share/opensearch/data]
+    healthcheck: { test: ["CMD-SHELL", "curl -fsS http://localhost:9200/_cluster/health | grep -E 'yellow|green'"], interval: 10s, retries: 30 }
+
+  jaeger:
+    image: jaegertracing/all-in-one:1.56
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    ports: ["16686:16686", "4317:4317", "4318:4318"]
+
+  # ───────── 4 services (one per domain) ─────────
+  atlas:
+    build: { context: ., dockerfile: services/atlas/Dockerfile }
+    environment: &svc_env
+      DATABASE_URL: postgresql+psycopg://postgres:${POSTGRES_PASSWORD:-dev_pw}@atlas_db:5432/atlas_db
+      REDIS_URL: redis://redis:6379/0
+      PUBSUB_EMULATOR_HOST: pubsub:8085
+      PUBSUB_PROJECT_ID: ${PUBSUB_PROJECT_ID:-local-eligibility}
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4317
+      SERVICE_NAME: atlas
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    depends_on:
+      atlas_db: { condition: service_healthy }
+      pubsub:   { condition: service_healthy }
+      redis:    { condition: service_healthy }
+    ports: ["8001:8000"]
+
+  member:
+    build: { context: ., dockerfile: services/member/Dockerfile }
+    environment:
+      <<: *svc_env
+      DATABASE_URL: postgresql+psycopg://postgres:${POSTGRES_PASSWORD:-dev_pw}@member_db:5432/member_db
+      SERVICE_NAME: member
+    depends_on:
+      member_db: { condition: service_healthy }
+      pubsub:    { condition: service_healthy }
+    ports: ["8002:8000"]
+
+  group:
+    build: { context: ., dockerfile: services/group/Dockerfile }
+    environment:
+      <<: *svc_env
+      DATABASE_URL: postgresql+psycopg://postgres:${POSTGRES_PASSWORD:-dev_pw}@group_db:5432/group_db
+      SERVICE_NAME: group
+    depends_on:
+      group_db: { condition: service_healthy }
+      pubsub:   { condition: service_healthy }
+    ports: ["8003:8000"]
+
+  plan:
+    build: { context: ., dockerfile: services/plan/Dockerfile }
+    environment:
+      <<: *svc_env
+      DATABASE_URL: postgresql+psycopg://postgres:${POSTGRES_PASSWORD:-dev_pw}@plan_db:5432/plan_db
+      SERVICE_NAME: plan
+    depends_on:
+      plan_db: { condition: service_healthy }
+      pubsub:  { condition: service_healthy }
+      redis:   { condition: service_healthy }
+    ports: ["8004:8000"]
+
+  # ───────── BFF + workers ─────────
+  bff:
+    build: { context: ., dockerfile: services/bff/Dockerfile }
+    environment:
+      <<: *svc_env
+      ATLAS_URL: http://atlas:8000
+      MEMBER_URL: http://member:8000
+      GROUP_URL: http://group:8000
+      PLAN_URL: http://plan:8000
+      OPENSEARCH_URL: http://opensearch:9200
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_BUCKET: ${MINIO_BUCKET:-eligibility-files}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minio}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minio12345}
+      SERVICE_NAME: bff
+    depends_on:
+      atlas:  { condition: service_started }
+      member: { condition: service_started }
+      group:  { condition: service_started }
+      plan:   { condition: service_started }
+      opensearch: { condition: service_healthy }
+      minio:  { condition: service_healthy }
+    ports: ["4000:8000"]
+
+  ingestion:
+    build: { context: ., dockerfile: workers/ingestion/Dockerfile }
+    environment:
+      <<: *svc_env
+      ATLAS_URL: http://atlas:8000
+      MEMBER_URL: http://member:8000
+      GROUP_URL: http://group:8000
+      PLAN_URL: http://plan:8000
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_BUCKET: ${MINIO_BUCKET:-eligibility-files}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minio}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minio12345}
+      SERVICE_NAME: ingestion
+    depends_on:
+      pubsub: { condition: service_healthy }
+      minio:  { condition: service_healthy }
+      atlas:  { condition: service_started }
+
+  projector:
+    build: { context: ., dockerfile: workers/projector/Dockerfile }
+    environment:
+      <<: *svc_env
+      ATLAS_DB_URL: postgresql+psycopg://postgres:${POSTGRES_PASSWORD:-dev_pw}@atlas_db:5432/atlas_db
+      MEMBER_DB_URL: postgresql+psycopg://postgres:${POSTGRES_PASSWORD:-dev_pw}@member_db:5432/member_db
+      GROUP_DB_URL: postgresql+psycopg://postgres:${POSTGRES_PASSWORD:-dev_pw}@group_db:5432/group_db
+      PLAN_DB_URL: postgresql+psycopg://postgres:${POSTGRES_PASSWORD:-dev_pw}@plan_db:5432/plan_db
+      OPENSEARCH_URL: http://opensearch:9200
+      SERVICE_NAME: projector
+    depends_on:
+      pubsub:      { condition: service_healthy }
+      opensearch:  { condition: service_healthy }
+      atlas_db:    { condition: service_healthy }
+      member_db:   { condition: service_healthy }
+      group_db:    { condition: service_healthy }
+      plan_db:     { condition: service_healthy }
+
+  outbox_relay:
+    build: { context: ., dockerfile: workers/outbox-relay/Dockerfile }
+    environment:
+      <<: *svc_env
+      ATLAS_DB_URL: postgresql+psycopg://postgres:${POSTGRES_PASSWORD:-dev_pw}@atlas_db:5432/atlas_db
+      MEMBER_DB_URL: postgresql+psycopg://postgres:${POSTGRES_PASSWORD:-dev_pw}@member_db:5432/member_db
+      GROUP_DB_URL: postgresql+psycopg://postgres:${POSTGRES_PASSWORD:-dev_pw}@group_db:5432/group_db
+      PLAN_DB_URL: postgresql+psycopg://postgres:${POSTGRES_PASSWORD:-dev_pw}@plan_db:5432/plan_db
+      SERVICE_NAME: outbox-relay
+    depends_on:
+      pubsub:    { condition: service_healthy }
+      atlas_db:  { condition: service_healthy }
+      member_db: { condition: service_healthy }
+      group_db:  { condition: service_healthy }
+      plan_db:   { condition: service_healthy }
+
+  frontend:
+    build: { context: ./frontend, dockerfile: Dockerfile }
+    environment:
+      VITE_BFF_URL: http://localhost:4000
+    ports: ["5173:5173"]
+    depends_on:
+      bff: { condition: service_started }
+
+volumes:
+  atlas_pg:
+  member_pg:
+  group_pg:
+  plan_pg:
+  minio_data:
+  os_data:

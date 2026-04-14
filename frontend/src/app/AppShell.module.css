@@ -1,0 +1,70 @@
+.shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+.header {
+  display: flex;
+  align-items: center;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface);
+  gap: 12px;
+}
+.brand {
+  font-weight: 700;
+  font-size: 15px;
+  margin-right: 12px;
+}
+.nav {
+  display: flex;
+  gap: 4px;
+  flex: 1;
+}
+.navItem {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--color-text);
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.navItem:hover {
+  background: var(--color-surface-hover);
+}
+.navItemActive {
+  background: var(--color-surface-hover);
+  border-color: var(--color-border);
+  font-weight: 600;
+}
+.themeBtn {
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 12px;
+  cursor: pointer;
+  color: var(--color-text);
+}
+.main {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+.footer {
+  border-top: 1px solid var(--color-border);
+  padding: 4px 16px;
+  font-size: 11px;
+  color: var(--color-text-muted);
+  display: flex;
+  justify-content: flex-end;
+  background: var(--color-surface);
+}
+.footerCid {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.about {
+  padding: 24px;
+  max-width: 720px;
+}

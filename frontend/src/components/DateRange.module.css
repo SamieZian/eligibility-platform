@@ -1,0 +1,33 @@
+.wrap {
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  padding: 6px 10px 10px;
+  margin: 0;
+  background: var(--color-surface);
+}
+.legend {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  padding: 0 4px;
+}
+.row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.cell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 12px;
+}
+.cell input {
+  padding: 6px 8px;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+.cellLabel {
+  color: var(--color-text-muted);
+}

@@ -1,0 +1,32 @@
+# Root workspace config — primarily ruff/mypy/pytest rules shared across services.
+[tool.ruff]
+line-length = 110
+target-version = "py311"
+src = ["services", "workers", "libs", "tests"]
+extend-exclude = ["**/migrations/versions/*.py"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "S", "N", "ASYNC", "C4", "SIM", "RET", "PL", "PERF"]
+ignore = ["E501", "PLR0913", "PLR2004", "S101", "S608"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S", "PLR", "N802"]
+"**/migrations/**" = ["N999"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+plugins = ["pydantic.mypy", "sqlalchemy.ext.mypy.plugin"]
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+addopts = "-q --strict-markers --disable-warnings"
+markers = [
+  "unit: fast, no I/O",
+  "integration: requires real pg/redis/pubsub/opensearch (Testcontainers)",
+  "e2e: full docker-compose stack"
+]
