@@ -46,10 +46,18 @@ def sessionmaker() -> async_sessionmaker[AsyncSession]:
 
 @asynccontextmanager
 async def session_scope(tenant_id: str | None = None) -> AsyncIterator[AsyncSession]:
-    """Open a session, set RLS tenant var, wrap in a transaction."""
+    """Open a session, set RLS tenant var, wrap in a transaction.
+
+    `SET LOCAL` does not accept bind parameters under Postgres' parse+bind
+    protocol, so we use `set_config(name, value, is_local=true)` instead — it
+    takes parameters and is transaction-scoped identically to SET LOCAL.
+    """
     sm = sessionmaker()
     async with sm() as s:
         async with s.begin():
             if tenant_id:
-                await s.execute(text("SET LOCAL app.tenant_id = :t"), {"t": tenant_id})
+                await s.execute(
+                    text("SELECT set_config('app.tenant_id', :t, true)"),
+                    {"t": tenant_id},
+                )
             yield s

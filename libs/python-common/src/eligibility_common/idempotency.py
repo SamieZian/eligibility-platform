@@ -13,16 +13,19 @@ from typing import Any
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-IDEMPOTENCY_DDL = """
+IDEMPOTENCY_DDL_STATEMENTS = [
+    """
 CREATE TABLE IF NOT EXISTS idempotency_keys (
   key TEXT PRIMARY KEY,
   request_hash TEXT NOT NULL,
   response JSONB NOT NULL,
   status INT NOT NULL,
   expires_at TIMESTAMPTZ NOT NULL
-);
-CREATE INDEX IF NOT EXISTS idempotency_expires ON idempotency_keys(expires_at);
-"""
+)
+""",
+    "CREATE INDEX IF NOT EXISTS idempotency_expires ON idempotency_keys(expires_at)",
+]
+IDEMPOTENCY_DDL = ";\n".join(IDEMPOTENCY_DDL_STATEMENTS)
 
 
 def request_hash(body: bytes) -> str:

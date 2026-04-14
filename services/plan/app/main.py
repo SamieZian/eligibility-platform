@@ -5,8 +5,8 @@ from contextlib import asynccontextmanager
 import uvicorn
 from eligibility_common.app_factory import create_app
 from eligibility_common.db import engine, session_scope
-from eligibility_common.idempotency import IDEMPOTENCY_DDL
-from eligibility_common.outbox import OUTBOX_DDL
+from eligibility_common.idempotency import IDEMPOTENCY_DDL_STATEMENTS
+from eligibility_common.outbox import OUTBOX_DDL_STATEMENTS
 from fastapi import FastAPI
 from sqlalchemy import text
 
@@ -14,27 +14,27 @@ from app.interfaces.api import router
 from app.settings import settings
 
 
+_PLAN_DDL = [
+    """
+    CREATE TABLE IF NOT EXISTS plans (
+      id UUID PRIMARY KEY,
+      plan_code TEXT NOT NULL UNIQUE,
+      name TEXT NOT NULL,
+      type TEXT NOT NULL,
+      metal_level TEXT,
+      attributes JSONB,
+      version BIGINT NOT NULL DEFAULT 1
+    )
+    """,
+    "CREATE INDEX IF NOT EXISTS plans_type ON plans (type)",
+]
+
+
 @asynccontextmanager
 async def lifespan(_app: FastAPI):  # type: ignore[no-untyped-def]
     async with engine().begin() as conn:
-        await conn.execute(text(OUTBOX_DDL))
-        await conn.execute(text(IDEMPOTENCY_DDL))
-        await conn.execute(
-            text(
-                """
-                CREATE TABLE IF NOT EXISTS plans (
-                  id UUID PRIMARY KEY,
-                  plan_code TEXT NOT NULL UNIQUE,
-                  name TEXT NOT NULL,
-                  type TEXT NOT NULL,
-                  metal_level TEXT,
-                  attributes JSONB,
-                  version BIGINT NOT NULL DEFAULT 1
-                );
-                CREATE INDEX IF NOT EXISTS plans_type ON plans (type);
-                """
-            )
-        )
+        for stmt in OUTBOX_DDL_STATEMENTS + IDEMPOTENCY_DDL_STATEMENTS + _PLAN_DDL:
+            await conn.execute(text(stmt))
     yield
 
 

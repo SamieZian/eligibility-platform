@@ -12,7 +12,7 @@ from app import clients
 from app.schema import schema
 from app.search import _engine
 from app.settings import settings
-from app.upload import FILE_INGESTION_JOBS_DDL, ensure_bucket
+from app.upload import FILE_INGESTION_JOBS_DDL_STATEMENTS, ensure_bucket
 from app.upload import router as upload_router
 
 
@@ -22,7 +22,8 @@ async def lifespan(_app: FastAPI):  # type: ignore[no-untyped-def]
     # migrations for this single tracking table — it lives or dies with atlas's db.
     try:
         async with _engine().begin() as conn:
-            await conn.execute(text(FILE_INGESTION_JOBS_DDL))
+            for stmt in FILE_INGESTION_JOBS_DDL_STATEMENTS:
+                await conn.execute(text(stmt))
     except Exception:
         # DB may not be reachable during local `pytest` runs — keep going.
         pass

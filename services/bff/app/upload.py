@@ -30,7 +30,8 @@ log = get_logger(__name__)
 router = APIRouter(tags=["files"])
 
 
-FILE_INGESTION_JOBS_DDL = """
+FILE_INGESTION_JOBS_DDL_STATEMENTS = [
+    """
 CREATE TABLE IF NOT EXISTS file_ingestion_jobs (
     id UUID PRIMARY KEY,
     tenant_id UUID NOT NULL,
@@ -42,9 +43,11 @@ CREATE TABLE IF NOT EXISTS file_ingestion_jobs (
     total_rows INTEGER,
     success_rows INTEGER,
     failed_rows INTEGER
-);
-CREATE INDEX IF NOT EXISTS file_jobs_by_tenant ON file_ingestion_jobs (tenant_id, uploaded_at DESC);
-"""
+)
+""",
+    "CREATE INDEX IF NOT EXISTS file_jobs_by_tenant ON file_ingestion_jobs (tenant_id, uploaded_at DESC)",
+]
+FILE_INGESTION_JOBS_DDL = ";\n".join(FILE_INGESTION_JOBS_DDL_STATEMENTS)
 
 
 def _s3_client() -> Any:

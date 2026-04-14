@@ -67,36 +67,47 @@ async def seed() -> None:
         httpx.AsyncClient(base_url=settings.group_url) as group,
         httpx.AsyncClient(base_url=settings.plan_url) as plan,
     ):
-        # Payers
-        for pid, name in ((PAYER_ICICI, "ICICI"), (PAYER_AETNA, "Aetna")):
-            await _post(group, "/payers", {"id": pid, "name": name})
-        # Employers
-        await _post(
+        # Payers — API generates IDs; we capture them.
+        icici = await _post(group, "/payers", {"name": "ICICI"})
+        aetna = await _post(group, "/payers", {"name": "Aetna"})
+        # Employers — use returned payer IDs.
+        swiggy = await _post(
             group,
             "/employers",
-            {"id": EMPLOYER_SWIGGY, "payer_id": PAYER_ICICI, "name": "Swiggy", "external_id": "SWIGGY"},
+            {"payer_id": icici["id"], "name": "Swiggy", "external_id": "SWIGGY"},
         )
-        await _post(
+        zomato = await _post(
             group,
             "/employers",
-            {"id": EMPLOYER_ZOMATO, "payer_id": PAYER_ICICI, "name": "Zomato", "external_id": "ZOMATO"},
+            {"payer_id": icici["id"], "name": "Zomato", "external_id": "ZOMATO"},
         )
         # Subgroups
-        for emp, sg in (
-            (EMPLOYER_SWIGGY, "SWIGGY_GROUP_A"),
-            (EMPLOYER_SWIGGY, "SWIGGY_GROUP_B"),
-            (EMPLOYER_ZOMATO, "ZOMATO_GROUP_A"),
-            (EMPLOYER_ZOMATO, "ZOMATO_GROUP_B"),
+        for emp_id, sg in (
+            (swiggy["id"], "SWIGGY_GROUP_A"),
+            (swiggy["id"], "SWIGGY_GROUP_B"),
+            (zomato["id"], "ZOMATO_GROUP_A"),
+            (zomato["id"], "ZOMATO_GROUP_B"),
         ):
-            await _post(group, "/subgroups", {"employer_id": emp, "name": sg})
-        # Plans
+            await _post(group, "/subgroups", {"employer_id": emp_id, "name": sg})
+        # Plans — API may generate its own IDs; capture them.
+        plan_ids: list[str] = []
         for p in PLANS:
-            await _post(plan, "/plans", p)
+            created = await _post(
+                plan,
+                "/plans",
+                {
+                    "plan_code": p["plan_code"],
+                    "name": p["name"],
+                    "type": p["type"],
+                    "metal_level": p["metal_level"],
+                },
+            )
+            plan_ids.append(created["id"])
         # Plan visibility — every plan visible to both employers
-        for emp in (EMPLOYER_SWIGGY, EMPLOYER_ZOMATO):
-            for p in PLANS:
-                await _post(group, "/visibility", {"employer_id": emp, "plan_id": p["id"]})
-    print("seed complete")
+        for emp_id in (swiggy["id"], zomato["id"]):
+            for pid in plan_ids:
+                await _post(group, "/visibility", {"employer_id": emp_id, "plan_id": pid})
+        print(f"seed complete: payers=[{icici['id']}, {aetna['id']}], employers=[swiggy={swiggy['id']}, zomato={zomato['id']}], plans={len(plan_ids)}")
 
 
 async def replay(file_id: str) -> None:

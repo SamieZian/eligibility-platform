@@ -64,7 +64,7 @@ class GroupRepo:
                     """
                     SELECT id, payer_id, name, external_id
                     FROM employers
-                    WHERE name ILIKE :n
+                    WHERE name ILIKE :n OR external_id ILIKE :n
                     ORDER BY name ASC
                     """
                 ),
@@ -75,6 +75,31 @@ class GroupRepo:
             Employer(id=r.id, payer_id=r.payer_id, name=r.name, external_id=r.external_id)
             for r in rows
         ]
+
+    async def find_employer_by_external_id(self, external_id: str) -> Employer | None:
+        """Match either exact, substring, or 834-sponsor-ref style (e.g. `ICICI_SWIGGY_POLICY`)."""
+        r = (
+            await self.s.execute(
+                text(
+                    """
+                    SELECT id, payer_id, name, external_id
+                    FROM employers
+                    WHERE external_id = :x
+                       OR external_id ILIKE :like
+                       OR :x ILIKE '%' || external_id || '%'
+                       OR :x ILIKE '%' || name || '%'
+                    ORDER BY (external_id = :x) DESC
+                    LIMIT 1
+                    """
+                ),
+                {"x": external_id, "like": f"%{external_id}%"},
+            )
+        ).first()
+        return (
+            Employer(id=r.id, payer_id=r.payer_id, name=r.name, external_id=r.external_id)
+            if r
+            else None
+        )
 
     # ---- Subgroup
     async def insert_subgroup(self, sg: Subgroup) -> None:

@@ -94,9 +94,21 @@ async def get_employer(employer_id: UUID) -> EmployerOut:
 
 
 @router.get("/employers", response_model=list[EmployerOut])
-async def find_employers(name: str = Query(...)) -> list[EmployerOut]:
+async def find_employers(
+    name: str | None = Query(None),
+    external_id: str | None = Query(None),
+) -> list[EmployerOut]:
     async with session_scope() as s:
         repo = GroupRepo(s)
+        if external_id:
+            e = await repo.find_employer_by_external_id(external_id)
+            return (
+                [EmployerOut(id=e.id, payer_id=e.payer_id, name=e.name, external_id=e.external_id)]
+                if e
+                else []
+            )
+        if not name:
+            return []
         matches = await repo.find_employers_by_name(name)
         return [
             EmployerOut(id=e.id, payer_id=e.payer_id, name=e.name, external_id=e.external_id)

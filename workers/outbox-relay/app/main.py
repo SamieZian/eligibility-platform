@@ -102,12 +102,20 @@ def _build_attributes(headers: dict[str, Any]) -> dict[str, str]:
 
 async def _publish_one(row: dict[str, Any]) -> None:
     headers = row.get("headers") or {}
-    payload = row.get("payload") or {}
+    payload = dict(row.get("payload") or {})
     topic = headers.get("topic")
     if not topic:
         raise ValueError(f"outbox row {row.get('id')} missing headers.topic")
 
+    # Consumers (projector, etc.) discriminate on `event_type` in the payload.
+    # The outbox table stores it alongside the payload, so merge it in here.
+    if row.get("event_type") and "event_type" not in payload:
+        payload["event_type"] = row["event_type"]
+    if row.get("aggregate_id") and "aggregate_id" not in payload:
+        payload["aggregate_id"] = str(row["aggregate_id"])
+
     attributes = _build_attributes(headers)
+    attributes.setdefault("event_type", str(row.get("event_type") or ""))
 
     async def _do() -> str:
         # pubsub.publish is sync; run in a thread to avoid blocking the loop.

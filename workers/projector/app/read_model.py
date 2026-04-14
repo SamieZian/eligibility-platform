@@ -19,7 +19,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 # --- Extension (pg_trgm) needs to run first since the GIN index depends on it.
 ENABLE_TRGM_DDL = "CREATE EXTENSION IF NOT EXISTS pg_trgm;"
 
-READ_MODEL_DDL = """
+READ_MODEL_DDL_STATEMENTS = [
+    """
 CREATE TABLE IF NOT EXISTS eligibility_view (
   enrollment_id UUID PRIMARY KEY,
   tenant_id UUID NOT NULL,
@@ -42,27 +43,31 @@ CREATE TABLE IF NOT EXISTS eligibility_view (
   effective_date DATE NOT NULL,
   termination_date DATE NOT NULL,
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-CREATE INDEX IF NOT EXISTS ev_tenant_employer_status
-  ON eligibility_view (tenant_id, employer_id, status, effective_date DESC);
-CREATE INDEX IF NOT EXISTS ev_card ON eligibility_view (card_number);
-CREATE INDEX IF NOT EXISTS ev_name_trgm
-  ON eligibility_view USING gin (lower(member_name) gin_trgm_ops);
-"""
+)
+""",
+    "CREATE INDEX IF NOT EXISTS ev_tenant_employer_status ON eligibility_view (tenant_id, employer_id, status, effective_date DESC)",
+    "CREATE INDEX IF NOT EXISTS ev_card ON eligibility_view (card_number)",
+    "CREATE INDEX IF NOT EXISTS ev_name_trgm ON eligibility_view USING gin (lower(member_name) gin_trgm_ops)",
+]
 
-LOOKUP_DDL = """
+LOOKUP_DDL_STATEMENTS = [
+    """
 CREATE TABLE IF NOT EXISTS plans_lookup (
   plan_id UUID PRIMARY KEY,
   plan_code TEXT,
   name TEXT,
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
-);
+)
+""",
+    """
 CREATE TABLE IF NOT EXISTS employers_lookup (
   employer_id UUID PRIMARY KEY,
   payer_id TEXT,
   name TEXT,
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
-);
+)
+""",
+    """
 CREATE TABLE IF NOT EXISTS members_lookup (
   member_id UUID PRIMARY KEY,
   card_number TEXT,
@@ -73,15 +78,22 @@ CREATE TABLE IF NOT EXISTS members_lookup (
   ssn_last4 TEXT,
   employer_id UUID,
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-"""
+)
+""",
+]
+
+# Legacy single-string versions for tests / sync-driver callers.
+READ_MODEL_DDL = ";\n".join(READ_MODEL_DDL_STATEMENTS)
+LOOKUP_DDL = ";\n".join(LOOKUP_DDL_STATEMENTS)
 
 
 async def apply_ddl(session: AsyncSession) -> None:
     """Run DDL idempotently. `pg_trgm` must exist before the GIN index."""
-    await session.execute(text(ENABLE_TRGM_DDL))
-    await session.execute(text(READ_MODEL_DDL))
-    await session.execute(text(LOOKUP_DDL))
+    await session.execute(text("CREATE EXTENSION IF NOT EXISTS pg_trgm"))
+    for stmt in READ_MODEL_DDL_STATEMENTS:
+        await session.execute(text(stmt))
+    for stmt in LOOKUP_DDL_STATEMENTS:
+        await session.execute(text(stmt))
 
 
 # --- Lookup upserts ---------------------------------------------------------

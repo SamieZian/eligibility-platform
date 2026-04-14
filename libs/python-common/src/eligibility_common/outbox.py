@@ -14,7 +14,9 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 
-OUTBOX_DDL = """
+# DDL split into discrete statements — asyncpg rejects multi-statement prepared queries.
+OUTBOX_DDL_STATEMENTS = [
+    """
 CREATE TABLE IF NOT EXISTS outbox (
   id BIGSERIAL PRIMARY KEY,
   aggregate TEXT NOT NULL,
@@ -24,9 +26,12 @@ CREATE TABLE IF NOT EXISTS outbox (
   headers JSONB NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   published_at TIMESTAMPTZ
-);
-CREATE INDEX IF NOT EXISTS outbox_unpublished ON outbox (id) WHERE published_at IS NULL;
-"""
+)
+""",
+    "CREATE INDEX IF NOT EXISTS outbox_unpublished ON outbox (id) WHERE published_at IS NULL",
+]
+# Legacy alias — may still be used by sync drivers that accept multi-statement scripts.
+OUTBOX_DDL = ";\n".join(OUTBOX_DDL_STATEMENTS)
 
 
 async def emit(
