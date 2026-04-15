@@ -68,6 +68,7 @@ def _bgn(txn_id: str, action: str = "2") -> str:
 # Member loop (2000) helpers
 # ---------------------------------------------------------------------------
 
+
 def _member(
     *,
     maint: str,
@@ -121,58 +122,150 @@ def _assemble(bgn_action: str, member_blocks: list[list[str]], txn_id: str = "TX
 # 1) Sample demo file
 # ---------------------------------------------------------------------------
 
+
 def _build_sample() -> str:
     blocks: list[list[str]] = []
 
     # a) Subscriber SHARMA PRIYA — ADD, Swiggy Gold Family
-    blocks.append(_member(
-        maint="021", subscriber_ind="Y", relationship="18", benefit_status="A",
-        last="SHARMA", first="PRIYA", ssn="123456789", dob="19900215", gender="F",
-        plan="PLAN-GOLD", level="FAM", effective="20260101", termination=None,
-        sponsor_ref="ICICI_SWIGGY_POLICY", group_ref="SWIGGY-A",
-    ))
+    blocks.append(
+        _member(
+            maint="021",
+            subscriber_ind="Y",
+            relationship="18",
+            benefit_status="A",
+            last="SHARMA",
+            first="PRIYA",
+            ssn="123456789",
+            dob="19900215",
+            gender="F",
+            plan="PLAN-GOLD",
+            level="FAM",
+            effective="20260101",
+            termination=None,
+            sponsor_ref="ICICI_SWIGGY_POLICY",
+            group_ref="SWIGGY-A",
+        )
+    )
     # b) Spouse dep of Priya — ADD
-    blocks.append(_member(
-        maint="021", subscriber_ind="N", relationship="01", benefit_status="A",
-        last="SHARMA", first="ROHIT", ssn="123456790", dob="19880712", gender="M",
-        plan="PLAN-GOLD", level="FAM", effective="20260101", termination=None,
-        sponsor_ref="ICICI_SWIGGY_POLICY", group_ref="SWIGGY-A",
-    ))
+    blocks.append(
+        _member(
+            maint="021",
+            subscriber_ind="N",
+            relationship="01",
+            benefit_status="A",
+            last="SHARMA",
+            first="ROHIT",
+            ssn="123456790",
+            dob="19880712",
+            gender="M",
+            plan="PLAN-GOLD",
+            level="FAM",
+            effective="20260101",
+            termination=None,
+            sponsor_ref="ICICI_SWIGGY_POLICY",
+            group_ref="SWIGGY-A",
+        )
+    )
     # c) Subscriber PATEL AMIT — ADD, Zomato Silver Individual
-    blocks.append(_member(
-        maint="021", subscriber_ind="Y", relationship="18", benefit_status="A",
-        last="PATEL", first="AMIT", ssn="234567891", dob="19851120", gender="M",
-        plan="PLAN-SILVER", level="IND", effective="20260101", termination=None,
-        sponsor_ref="ICICI_ZOMATO_POLICY", group_ref="ZOMATO-A",
-    ))
+    blocks.append(
+        _member(
+            maint="021",
+            subscriber_ind="Y",
+            relationship="18",
+            benefit_status="A",
+            last="PATEL",
+            first="AMIT",
+            ssn="234567891",
+            dob="19851120",
+            gender="M",
+            plan="PLAN-SILVER",
+            level="IND",
+            effective="20260101",
+            termination=None,
+            sponsor_ref="ICICI_ZOMATO_POLICY",
+            group_ref="ZOMATO-A",
+        )
+    )
     # d) Subscriber KAUR SIMRAN — ADD, Swiggy Gold Individual
-    blocks.append(_member(
-        maint="021", subscriber_ind="Y", relationship="18", benefit_status="A",
-        last="KAUR", first="SIMRAN", ssn="345678912", dob="19920804", gender="F",
-        plan="PLAN-GOLD", level="IND", effective="20260101", termination=None,
-        sponsor_ref="ICICI_SWIGGY_POLICY", group_ref="SWIGGY-A",
-    ))
+    blocks.append(
+        _member(
+            maint="021",
+            subscriber_ind="Y",
+            relationship="18",
+            benefit_status="A",
+            last="KAUR",
+            first="SIMRAN",
+            ssn="345678912",
+            dob="19920804",
+            gender="F",
+            plan="PLAN-GOLD",
+            level="IND",
+            effective="20260101",
+            termination=None,
+            sponsor_ref="ICICI_SWIGGY_POLICY",
+            group_ref="SWIGGY-A",
+        )
+    )
     # e) Subscriber NAIR ARJUN — ADD, Zomato Silver Individual
-    blocks.append(_member(
-        maint="021", subscriber_ind="Y", relationship="18", benefit_status="A",
-        last="NAIR", first="ARJUN", ssn="456789123", dob="19810308", gender="M",
-        plan="PLAN-SILVER", level="IND", effective="20260101", termination=None,
-        sponsor_ref="ICICI_ZOMATO_POLICY", group_ref="ZOMATO-A",
-    ))
+    blocks.append(
+        _member(
+            maint="021",
+            subscriber_ind="Y",
+            relationship="18",
+            benefit_status="A",
+            last="NAIR",
+            first="ARJUN",
+            ssn="456789123",
+            dob="19810308",
+            gender="M",
+            plan="PLAN-SILVER",
+            level="IND",
+            effective="20260101",
+            termination=None,
+            sponsor_ref="ICICI_ZOMATO_POLICY",
+            group_ref="ZOMATO-A",
+        )
+    )
     # TERMINATE (024) of Patel Amit
-    blocks.append(_member(
-        maint="024", subscriber_ind="Y", relationship="18", benefit_status="I",
-        last="PATEL", first="AMIT", ssn="234567891", dob="19851120", gender="M",
-        plan="PLAN-SILVER", level="IND", effective=None, termination="20260331",
-        sponsor_ref="ICICI_ZOMATO_POLICY", group_ref="ZOMATO-A",
-    ))
+    blocks.append(
+        _member(
+            maint="024",
+            subscriber_ind="Y",
+            relationship="18",
+            benefit_status="I",
+            last="PATEL",
+            first="AMIT",
+            ssn="234567891",
+            dob="19851120",
+            gender="M",
+            plan="PLAN-SILVER",
+            level="IND",
+            effective=None,
+            termination="20260331",
+            sponsor_ref="ICICI_ZOMATO_POLICY",
+            group_ref="ZOMATO-A",
+        )
+    )
     # CORRECTION (030) of Kaur Simran — new effective 20260115
-    blocks.append(_member(
-        maint="030", subscriber_ind="Y", relationship="18", benefit_status="A",
-        last="KAUR", first="SIMRAN", ssn="345678912", dob="19920804", gender="F",
-        plan="PLAN-GOLD", level="IND", effective="20260115", termination=None,
-        sponsor_ref="ICICI_SWIGGY_POLICY", group_ref="SWIGGY-A",
-    ))
+    blocks.append(
+        _member(
+            maint="030",
+            subscriber_ind="Y",
+            relationship="18",
+            benefit_status="A",
+            last="KAUR",
+            first="SIMRAN",
+            ssn="345678912",
+            dob="19920804",
+            gender="F",
+            plan="PLAN-GOLD",
+            level="IND",
+            effective="20260115",
+            termination=None,
+            sponsor_ref="ICICI_SWIGGY_POLICY",
+            group_ref="SWIGGY-A",
+        )
+    )
 
     return _assemble(bgn_action="2", member_blocks=blocks, txn_id="TXN0001")
 
@@ -181,19 +274,42 @@ def _build_sample() -> str:
 # 2) Replace file (BGN08 = 22)
 # ---------------------------------------------------------------------------
 
+
 def _build_replace() -> str:
     blocks = [
         _member(
-            maint="021", subscriber_ind="Y", relationship="18", benefit_status="A",
-            last="SHARMA", first="PRIYA", ssn="123456789", dob="19900215", gender="F",
-            plan="PLAN-GOLD", level="FAM", effective="20260101", termination=None,
-            sponsor_ref="ICICI_SWIGGY_POLICY", group_ref="SWIGGY-A",
+            maint="021",
+            subscriber_ind="Y",
+            relationship="18",
+            benefit_status="A",
+            last="SHARMA",
+            first="PRIYA",
+            ssn="123456789",
+            dob="19900215",
+            gender="F",
+            plan="PLAN-GOLD",
+            level="FAM",
+            effective="20260101",
+            termination=None,
+            sponsor_ref="ICICI_SWIGGY_POLICY",
+            group_ref="SWIGGY-A",
         ),
         _member(
-            maint="021", subscriber_ind="Y", relationship="18", benefit_status="A",
-            last="KAUR", first="SIMRAN", ssn="345678912", dob="19920804", gender="F",
-            plan="PLAN-GOLD", level="IND", effective="20260115", termination=None,
-            sponsor_ref="ICICI_SWIGGY_POLICY", group_ref="SWIGGY-A",
+            maint="021",
+            subscriber_ind="Y",
+            relationship="18",
+            benefit_status="A",
+            last="KAUR",
+            first="SIMRAN",
+            ssn="345678912",
+            dob="19920804",
+            gender="F",
+            plan="PLAN-GOLD",
+            level="IND",
+            effective="20260115",
+            termination=None,
+            sponsor_ref="ICICI_SWIGGY_POLICY",
+            group_ref="SWIGGY-A",
         ),
     ]
     return _assemble(bgn_action="22", member_blocks=blocks, txn_id="TXN0002")
@@ -204,16 +320,44 @@ def _build_replace() -> str:
 # ---------------------------------------------------------------------------
 
 _LAST_NAMES = [
-    "SHARMA", "PATEL", "KAUR", "NAIR", "REDDY", "IYER", "KHAN",
-    "SINGH", "GUPTA", "MENON", "RAO", "VERMA", "BANERJEE", "DAS",
+    "SHARMA",
+    "PATEL",
+    "KAUR",
+    "NAIR",
+    "REDDY",
+    "IYER",
+    "KHAN",
+    "SINGH",
+    "GUPTA",
+    "MENON",
+    "RAO",
+    "VERMA",
+    "BANERJEE",
+    "DAS",
 ]
 _FIRST_NAMES_F = [
-    "PRIYA", "SIMRAN", "ANJALI", "DIVYA", "MEERA", "KAVYA", "RIYA",
-    "POOJA", "SWATI", "NEHA",
+    "PRIYA",
+    "SIMRAN",
+    "ANJALI",
+    "DIVYA",
+    "MEERA",
+    "KAVYA",
+    "RIYA",
+    "POOJA",
+    "SWATI",
+    "NEHA",
 ]
 _FIRST_NAMES_M = [
-    "AMIT", "ARJUN", "ROHIT", "VIKRAM", "RAHUL", "KARAN", "ADITYA",
-    "SANJAY", "NIKHIL", "SURESH",
+    "AMIT",
+    "ARJUN",
+    "ROHIT",
+    "VIKRAM",
+    "RAHUL",
+    "KARAN",
+    "ADITYA",
+    "SANJAY",
+    "NIKHIL",
+    "SURESH",
 ]
 
 
@@ -238,18 +382,32 @@ def _build_large(n: int = 1000) -> str:
             sponsor = "ICICI_ZOMATO_POLICY"
             group = "ZOMATO-A"
             plan = "PLAN-SILVER"
-        blocks.append(_member(
-            maint="021", subscriber_ind="Y", relationship="18", benefit_status="A",
-            last=last, first=first, ssn=ssn, dob=dob, gender=gender,
-            plan=plan, level="IND", effective="20260101", termination=None,
-            sponsor_ref=sponsor, group_ref=group,
-        ))
+        blocks.append(
+            _member(
+                maint="021",
+                subscriber_ind="Y",
+                relationship="18",
+                benefit_status="A",
+                last=last,
+                first=first,
+                ssn=ssn,
+                dob=dob,
+                gender=gender,
+                plan=plan,
+                level="IND",
+                effective="20260101",
+                termination=None,
+                sponsor_ref=sponsor,
+                group_ref=group,
+            )
+        )
     return _assemble(bgn_action="2", member_blocks=blocks, txn_id="TXN0003")
 
 
 # ---------------------------------------------------------------------------
 # Entrypoint
 # ---------------------------------------------------------------------------
+
 
 def main() -> None:
     OUT_DIR.mkdir(parents=True, exist_ok=True)

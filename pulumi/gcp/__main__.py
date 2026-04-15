@@ -25,9 +25,8 @@ This is a skeleton — it defines resources but does not manage IAM
 bindings, CMEK, or VPC-SC perimeters. Those are captured as TODOs in
 the README and are the natural next layer for a production stack.
 """
-from __future__ import annotations
 
-from typing import List, Tuple
+from __future__ import annotations
 
 import pulumi
 import pulumi_gcp as gcp
@@ -45,10 +44,10 @@ ENV: str = _cfg.get("env") or "dev"
 IMAGE_TAG: str = _cfg.get("image_tag") or "latest"
 
 # Bounded contexts — each gets its own Cloud SQL instance + DB + user.
-BOUNDED_CONTEXTS: List[str] = ["atlas", "member", "group", "plan"]
+BOUNDED_CONTEXTS: list[str] = ["atlas", "member", "group", "plan"]
 
 # Pub/Sub event families — one topic + sub + DLQ per family.
-EVENT_FAMILIES: List[str] = [
+EVENT_FAMILIES: list[str] = [
     "enrollment-events",
     "member-events",
     "group-events",
@@ -58,7 +57,7 @@ EVENT_FAMILIES: List[str] = [
 
 # Cloud Run services — (name, container port). BFF runs on 4000 (Strawberry
 # GraphQL + FastAPI), the FastAPI services all use 8000.
-CLOUD_RUN_SERVICES: List[Tuple[str, int]] = [
+CLOUD_RUN_SERVICES: list[tuple[str, int]] = [
     ("atlas", 8000),
     ("member", 8000),
     ("group", 8000),
@@ -74,7 +73,7 @@ LABELS = {"app": "eligibility-platform", "env": ENV, "managed-by": "pulumi"}
 # ---------------------------------------------------------------------------
 
 
-def _network() -> Tuple[gcp.compute.Network, gcp.compute.Subnetwork, gcp.servicenetworking.Connection]:
+def _network() -> tuple[gcp.compute.Network, gcp.compute.Subnetwork, gcp.servicenetworking.Connection]:
     vpc = gcp.compute.Network(
         "eligibility-vpc",
         name=f"eligibility-{ENV}-vpc",
@@ -348,12 +347,8 @@ def _cloud_run(
 
         envs: list[gcp.cloudrunv2.ServiceTemplateContainerEnvArgs] = [
             gcp.cloudrunv2.ServiceTemplateContainerEnvArgs(name="ENV", value=ENV),
-            gcp.cloudrunv2.ServiceTemplateContainerEnvArgs(
-                name="GCP_PROJECT", value=PROJECT
-            ),
-            gcp.cloudrunv2.ServiceTemplateContainerEnvArgs(
-                name="FILES_BUCKET", value=files_bucket.name
-            ),
+            gcp.cloudrunv2.ServiceTemplateContainerEnvArgs(name="GCP_PROJECT", value=PROJECT),
+            gcp.cloudrunv2.ServiceTemplateContainerEnvArgs(name="FILES_BUCKET", value=files_bucket.name),
         ]
 
         # Bounded-context services get their DATABASE_URL from the matching

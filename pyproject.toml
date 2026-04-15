@@ -1,13 +1,25 @@
-# Root workspace config — primarily ruff/mypy/pytest rules shared across services.
+# Platform repo workspace config.
+# This repo only owns docs, samples, scripts, integration tests, and the
+# Pulumi program. Service / worker / frontend code lives in sibling repos,
+# each with its own CI + pyproject.
 [tool.ruff]
 line-length = 110
 target-version = "py311"
-src = ["services", "workers", "libs", "tests"]
-extend-exclude = ["**/migrations/versions/*.py"]
+src = ["tests", "scripts", "samples", "pulumi"]
+extend-exclude = ["**/migrations/versions/*.py", ".venv", "venv"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "UP", "S", "N", "ASYNC", "C4", "SIM", "RET", "PL", "PERF"]
-ignore = ["E501", "PLR0913", "PLR2004", "S101", "S608"]
+# Ignored, with rationale:
+#   E501     long lines — line-length is already generous
+#   PLR0913  too-many-arguments — Pulumi typed args legitimately have 8+ kwargs
+#   PLR2004  magic-value-comparison — noisy in test assertions
+#   S101     assert — pytest uses them
+#   S110     try-except-pass — intentional in cleanup / best-effort branches
+#   S608     hardcoded-sql — false positives on parameterized text() statements
+#   SIM105   suppressible-exception — try/except/pass is sometimes clearer
+#   PLC0415  import-outside-top-level — used for lazy imports, circular avoidance, optional deps
+ignore = ["E501", "PLR0913", "PLR2004", "S101", "S110", "S608", "SIM105", "PLC0415"]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["S", "PLR", "N802"]

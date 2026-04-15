@@ -2,10 +2,10 @@
 
 Exits non-zero on any assertion failure. Safe to run multiple times.
 """
+
 from __future__ import annotations
 
 import json
-import subprocess
 import sys
 import time
 import urllib.request

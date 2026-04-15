@@ -3,6 +3,7 @@
 Skips cleanly if Docker or testcontainers isn't available (so CI can still run
 the unit suite without docker).
 """
+
 from __future__ import annotations
 
 import os

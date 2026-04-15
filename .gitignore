@@ -49,3 +49,7 @@ Pulumi.*.yaml
 # Local data
 data/
 *.log
+
+# Local-only submission email draft (do not commit)
+SUBMISSION_EMAIL.md
+SUBMISSION_EMAIL.html

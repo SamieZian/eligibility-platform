@@ -8,10 +8,9 @@ Verifies:
   the closed row is preserved; only txn_to is touched).
 - Outbox accumulates one row per command.
 """
+
 from __future__ import annotations
 
-import importlib
-import os
 import sys
 from datetime import date
 from pathlib import Path
@@ -19,7 +18,6 @@ from uuid import uuid4
 
 import pytest
 from sqlalchemy import text
-
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -46,6 +44,7 @@ async def test_atlas_bitemporal_lifecycle(pg_url: str) -> None:
 
     # Re-create engine so it picks up the pg_url fixture.
     from eligibility_common import db as common_db  # noqa: WPS433 — test-time reset
+
     common_db._engine = None
     common_db._sessionmaker = None
     from eligibility_common.db import engine, session_scope

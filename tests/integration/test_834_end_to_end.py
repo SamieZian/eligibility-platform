@@ -3,6 +3,7 @@
 No network. Drives the pipeline in-process: parse the golden 834 file, map
 instructions into atlas commands, apply, and assert the final timeline shape.
 """
+
 from __future__ import annotations
 
 import sys
@@ -34,6 +35,7 @@ async def test_834_sample_produces_expected_timeline(pg_url: str) -> None:
         TerminateCommand,
     )
     from eligibility_common import db as common_db
+
     common_db._engine = None
     common_db._sessionmaker = None
     from eligibility_common.db import engine, session_scope
@@ -144,9 +146,11 @@ async def test_834_sample_produces_expected_timeline(pg_url: str) -> None:
         assert res.n >= 3, f"expected >=3 enrollment rows, got {res.n}"
 
         # At least one TERMED row (the cancel of Patel Amit)
-        res = (await s.execute(
-            text("SELECT COUNT(*)::int AS n FROM enrollments WHERE status='termed' AND txn_to > now()")
-        )).first()
+        res = (
+            await s.execute(
+                text("SELECT COUNT(*)::int AS n FROM enrollments WHERE status='termed' AND txn_to > now()")
+            )
+        ).first()
         assert res.n >= 1
 
         # The outbox accumulated events

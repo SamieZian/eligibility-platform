@@ -2,6 +2,7 @@
 
 Usage: python scripts/replay_dlq.py --topic enrollment.events.dlq
 """
+
 from __future__ import annotations
 
 import argparse
